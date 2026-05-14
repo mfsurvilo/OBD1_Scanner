@@ -1,0 +1,12 @@
+# Flask web app
+flask
+flask-socketio
+
+# Serial communication with ECU/microcontroller
+pyserial
+
+# Data plotting (developer_tools)
+matplotlib
+
+# Firmware build system
+platformio

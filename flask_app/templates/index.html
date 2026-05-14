@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subaru SSM1 ECU Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Subaru SSM1 ECU Monitor</h1>
+        <div class="status-bar">
+            <span id="connection-status" class="status disconnected">Disconnected</span>
+            <span id="port-info"></span>
+        </div>
+        <div class="controls">
+            <button id="toggle-view" class="btn">Switch to Graphs</button>
+            <button id="download-csv" class="btn btn-secondary">Download CSV</button>
+        </div>
+    </header>
+
+    <!-- Trouble Codes Panel -->
+    <div id="dtc-panel" class="dtc-panel">
+        <div class="dtc-header" onclick="toggleDtcPanel()">
+            <h2>Trouble Codes (DTC)</h2>
+            <span id="dtc-indicator" class="dtc-indicator ok">OK</span>
+            <span class="dtc-toggle">▼</span>
+        </div>
+        <div id="dtc-content" class="dtc-content">
+            <div class="dtc-controls">
+                <button id="dtc-read-btn" class="btn btn-primary">Read Codes</button>
+                <button id="dtc-clear-btn" class="btn btn-danger">Clear Codes</button>
+                <span id="dtc-last-read">Never read</span>
+            </div>
+            <div class="dtc-codes">
+                <div class="dtc-section">
+                    <h3>Active Codes</h3>
+                    <div id="dtc-active" class="dtc-list">
+                        <span class="dtc-empty">No codes read yet</span>
+                    </div>
+                </div>
+                <div class="dtc-section">
+                    <h3>Stored Codes</h3>
+                    <div id="dtc-stored" class="dtc-list">
+                        <span class="dtc-empty">No codes read yet</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main>
+        <!-- Gauges View -->
+        <div id="gauges-view" class="view active">
+            <div class="gauges-grid">
+                <!-- RPM Gauge -->
+                <div class="gauge-container" data-param="EngineSpeed">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-EngineSpeed" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-EngineSpeed">--</div>
+                        <div class="gauge-label">RPM</div>
+                    </div>
+                </div>
+
+                <!-- Speed Gauge -->
+                <div class="gauge-container" data-param="VehicleSpeed">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-VehicleSpeed" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-VehicleSpeed">--</div>
+                        <div class="gauge-label">km/h</div>
+                    </div>
+                </div>
+
+                <!-- Coolant Temp Gauge -->
+                <div class="gauge-container" data-param="CoolantTemp">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-CoolantTemp" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-CoolantTemp">--</div>
+                        <div class="gauge-label">Coolant °C</div>
+                    </div>
+                </div>
+
+                <!-- Throttle Position -->
+                <div class="gauge-container" data-param="ThrottlePosition">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-ThrottlePosition" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-ThrottlePosition">--</div>
+                        <div class="gauge-label">Throttle %</div>
+                    </div>
+                </div>
+
+                <!-- Battery Voltage -->
+                <div class="gauge-container" data-param="BatteryVoltage">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-BatteryVoltage" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-BatteryVoltage">--</div>
+                        <div class="gauge-label">Battery V</div>
+                    </div>
+                </div>
+
+                <!-- O2 Sensor -->
+                <div class="gauge-container" data-param="O2Average">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-O2Average" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-O2Average">--</div>
+                        <div class="gauge-label">O2 mV</div>
+                    </div>
+                </div>
+
+                <!-- Ignition Advance -->
+                <div class="gauge-container" data-param="IgnitionAdvance">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-IgnitionAdvance" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-IgnitionAdvance">--</div>
+                        <div class="gauge-label">Timing °</div>
+                    </div>
+                </div>
+
+                <!-- AF Correction -->
+                <div class="gauge-container" data-param="AFCorrection">
+                    <div class="gauge">
+                        <svg viewBox="0 0 200 120">
+                            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                            <path class="gauge-fill" id="gauge-AFCorrection" d="M 20 100 A 80 80 0 0 1 180 100" />
+                        </svg>
+                        <div class="gauge-value" id="value-AFCorrection">--</div>
+                        <div class="gauge-label">AF Corr</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secondary values -->
+            <div class="secondary-values">
+                <div class="value-box" data-param="EngineLoad">
+                    <span class="label">Load</span>
+                    <span class="value" id="value-EngineLoad">--</span>
+                </div>
+                <div class="value-box" data-param="AirflowSensor">
+                    <span class="label">Airflow</span>
+                    <span class="value" id="value-AirflowSensor">--%</span>
+                </div>
+                <div class="value-box" data-param="InjectorPulseWidth">
+                    <span class="label">Injector</span>
+                    <span class="value" id="value-InjectorPulseWidth">-- ms</span>
+                </div>
+                <div class="value-box" data-param="ISUDutyValve">
+                    <span class="label">ISU Duty</span>
+                    <span class="value" id="value-ISUDutyValve">--%</span>
+                </div>
+                <div class="value-box" data-param="KnockCorrection">
+                    <span class="label">Knock</span>
+                    <span class="value" id="value-KnockCorrection">--</span>
+                </div>
+                <div class="value-box" data-param="AtmosphericPressure">
+                    <span class="label">Atm Press</span>
+                    <span class="value" id="value-AtmosphericPressure">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graphs View -->
+        <div id="graphs-view" class="view">
+            <div class="graphs-controls">
+                <button id="download-csv-graphs" class="btn">Download Data as CSV</button>
+                <a href="/api/download_csv" class="btn btn-secondary">Download Server Data</a>
+                <span id="data-count">0 samples</span>
+            </div>
+            <div class="graphs-grid">
+                <div class="chart-container">
+                    <canvas id="chart-EngineSpeed"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-VehicleSpeed"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-CoolantTemp"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-ThrottlePosition"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-O2Average"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-AFCorrection"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
