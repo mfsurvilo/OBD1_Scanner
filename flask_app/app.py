@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Subaru SSM1 ECU Live Monitor - Flask Backend
-Reads data from Teensy over serial and serves it via WebSocket
+Reads data from ESP32 over WiFi or serial and serves it via WebSocket
 Now with Trouble Code (DTC) support
 """
 
@@ -10,6 +10,8 @@ import re
 import json
 import threading
 import time
+import argparse
+import requests
 from collections import deque
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
@@ -87,6 +89,88 @@ dtc_data = {
 ser = None
 serial_thread = None
 running = False
+
+# WiFi mode configuration
+ESP32_IP = "192.168.4.1"  # Default ESP32 AP IP
+ESP32_DATA_URL = f"http://{ESP32_IP}/data"
+wifi_mode = False  # Set via command line
+
+
+def wifi_reader():
+    global running, connection_status
+    
+    while running:
+        try:
+            response = requests.get(ESP32_DATA_URL, timeout=2)
+            if response.status_code == 200:
+                data = response.json()
+                
+                if not connection_status['connected']:
+                    connection_status = {'connected': True, 'port': f'WiFi ({ESP32_IP})', 'error': None}
+                    socketio.emit('connection_status', connection_status, namespace='/')
+                    print(f"Connected to ESP32 at {ESP32_IP}")
+                
+                # Process parameters
+                if 'params' in data:
+                    for param in data['params']:
+                        param_name = param.get('name')
+                        raw_value = param.get('raw')
+                        
+                        if param_name and param_name in CONVERSIONS and raw_value is not None:
+                            conv = CONVERSIONS[param_name]
+                            converted_value = conv['formula'](raw_value)
+                            
+                            timestamp = time.time()
+                            data_history[param_name].append({
+                                'time': timestamp,
+                                'value': converted_value,
+                                'raw': raw_value
+                            })
+                            current_values[param_name] = {
+                                'value': converted_value,
+                                'raw': raw_value,
+                                'unit': conv['unit'],
+                                'min': conv['min'],
+                                'max': conv['max']
+                            }
+                            
+                            emit_data = {
+                                'param': param_name,
+                                'value': converted_value,
+                                'raw': raw_value,
+                                'unit': conv['unit'],
+                                'time': timestamp
+                            }
+                            socketio.emit('data_update', emit_data, namespace='/')
+                
+                # Process DTCs if present
+                if 'dtc' in data:
+                    for dtc in data['dtc']:
+                        dtc_type = dtc.get('type', 'active').lower()
+                        code = dtc.get('code', '')
+                        desc = dtc.get('desc', '')
+                        
+                        if dtc_type == 'active':
+                            if not any(d['code'] == code for d in dtc_data['active']):
+                                dtc_data['active'].append({'code': code, 'description': desc})
+                        else:
+                            if not any(d['code'] == code for d in dtc_data['stored']):
+                                dtc_data['stored'].append({'code': code, 'description': desc})
+                    
+                    dtc_data['lastRead'] = time.time()
+                    socketio.emit('dtc_update', dtc_data, namespace='/')
+                
+            time.sleep(0.2)  # Poll every 200ms
+            
+        except requests.exceptions.RequestException as e:
+            if connection_status['connected']:
+                connection_status = {'connected': False, 'port': None, 'error': str(e)}
+                socketio.emit('connection_status', connection_status, namespace='/')
+                print(f"WiFi connection lost: {e}")
+            time.sleep(1)
+        except Exception as e:
+            print(f"WiFi reader error: {e}")
+            time.sleep(0.5)
 
 
 def find_teensy_port():
@@ -247,8 +331,14 @@ def serial_reader():
 
 @app.route('/')
 def index():
-    """Serve the main page."""
-    return render_template('index.html', parameters=list(CONVERSIONS.keys()))
+    """Serve the main dashboard page."""
+    return render_template('dashboard.html', parameters=list(CONVERSIONS.keys()), conversions=CONVERSIONS)
+
+
+@app.route('/dashboard')
+def dashboard():
+    """Serve the dashboard page (alias)."""
+    return render_template('dashboard.html', parameters=list(CONVERSIONS.keys()), conversions=CONVERSIONS)
 
 
 @app.route('/api/status')
@@ -357,13 +447,65 @@ def clear_dtc():
     return jsonify({'status': 'error', 'message': 'Not connected'}), 503
 
 
+@app.route('/api/scaling', methods=['GET'])
+def get_scaling():
+    """Get scaling factors from device."""
+    global wifi_mode, ESP32_IP
+    if wifi_mode:
+        try:
+            response = requests.get(f"http://{ESP32_IP}/scaling", timeout=5)
+            if response.status_code == 200:
+                return jsonify(response.json())
+            return jsonify({'status': 'error', 'message': 'Device returned error'}), response.status_code
+        except requests.RequestException as e:
+            return jsonify({'status': 'error', 'message': f'Could not reach device: {str(e)}'}), 503
+    else:
+        # Serial mode - not implemented for scaling
+        return jsonify({'status': 'error', 'message': 'Scaling config only available in WiFi mode'}), 501
+
+
+@app.route('/api/scaling', methods=['POST'])
+def set_scaling():
+    """Set scaling factors on device."""
+    global wifi_mode, ESP32_IP
+    if wifi_mode:
+        try:
+            data = request.get_json()
+            response = requests.post(
+                f"http://{ESP32_IP}/scaling",
+                json=data,
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
+            if response.status_code == 200:
+                result = response.json()
+                # Emit to all connected clients
+                socketio.emit('scaling_config', result, namespace='/')
+                return jsonify(result)
+            return jsonify({'status': 'error', 'message': 'Device returned error'}), response.status_code
+        except requests.RequestException as e:
+            return jsonify({'status': 'error', 'message': f'Could not reach device: {str(e)}'}), 503
+    else:
+        return jsonify({'status': 'error', 'message': 'Scaling config only available in WiFi mode'}), 501
+
+
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection."""
+    global wifi_mode, ESP32_IP
     print("Client connected")
     socketio.emit('connection_status', connection_status)
     socketio.emit('current_values', current_values)
     socketio.emit('dtc_update', dtc_data)
+    
+    # Send scaling config if in WiFi mode
+    if wifi_mode:
+        try:
+            response = requests.get(f"http://{ESP32_IP}/scaling", timeout=3)
+            if response.status_code == 200:
+                socketio.emit('scaling_config', response.json())
+        except:
+            pass  # Silently ignore - scaling will load when settings opened
 
 
 @socketio.on('disconnect')
@@ -408,8 +550,16 @@ def start_serial_thread():
     serial_thread.start()
 
 
-def stop_serial_thread():
-    """Stop the serial reader thread."""
+def start_wifi_thread():
+    """Start the WiFi reader thread."""
+    global serial_thread, running
+    running = True
+    serial_thread = threading.Thread(target=wifi_reader, daemon=True)
+    serial_thread.start()
+
+
+def stop_reader_thread():
+    """Stop the reader thread."""
     global running, ser
     running = False
     if ser and ser.is_open:
@@ -417,10 +567,30 @@ def stop_serial_thread():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Subaru SSM1 ECU Monitor')
+    parser.add_argument('--wifi', action='store_true', 
+                        help='Use WiFi mode (connect to ESP32 AP)')
+    parser.add_argument('--ip', type=str, default='192.168.4.1',
+                        help='ESP32 IP address (default: 192.168.4.1)')
+    args = parser.parse_args()
+    
+    wifi_mode = args.wifi
+    if args.ip:
+        ESP32_IP = args.ip
+        ESP32_DATA_URL = f"http://{ESP32_IP}/data"
+    
     print("Starting Subaru SSM1 ECU Monitor...")
     print("Open http://localhost:5000 in your browser")
-    start_serial_thread()
+    
+    if wifi_mode:
+        print(f"Mode: WiFi (connecting to ESP32 at {ESP32_IP})")
+        print("Make sure you're connected to the OBD1_Scanner WiFi network!")
+        start_wifi_thread()
+    else:
+        print("Mode: Serial")
+        start_serial_thread()
+    
     try:
         socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
     finally:
-        stop_serial_thread()
+        stop_reader_thread()

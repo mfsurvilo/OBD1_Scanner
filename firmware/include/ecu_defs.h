@@ -452,6 +452,20 @@ const EcuParam ecuParams[] = {
 #endif
 
 //=============================================================================
+// DTC Code Names (from b10scan.asm)
+// Universal across all ECUs - maps bit positions to code names
+//=============================================================================
+
+static const char* dtcNames[] = {
+  // Byte 1 (bits 0-6)
+  "11-Crank", "12-StartSw", "13-Cam", "14-Inj1", "15-Inj2", "16-Inj3", "17-Inj4", nullptr,
+  // Byte 2 (bits 0-7)  
+  "21-Temp", "22-Knock", "23-MAF", "24-IAC", "31-TPS", "32-O2", "33-VSS", "35-Purge",
+  // Byte 3 (bits 0-7)
+  "41-FuelTrim", "42-IdleSw", nullptr, "44-WGC", "45-Baro", "49-WrongMAF", "51-NeutSw", "52-ParkSw"
+};
+
+//=============================================================================
 // Fallback / Error Check
 //=============================================================================
 #ifndef ECU_ROM_ID

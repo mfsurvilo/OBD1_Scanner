@@ -4,77 +4,75 @@
 #include <Arduino.h>
 
 //=============================================================================
-// LED Status Module
+// LED Status Class
 // Handles RGB LED status indication and patterns
+// Queries ECU and DataServer for system state
 //=============================================================================
 
-namespace LED {
-
-//-----------------------------------------------------------------------------
 // LED Color Flags (can be OR'd together)
-//-----------------------------------------------------------------------------
-constexpr uint8_t RED    = 0x01;
-constexpr uint8_t GREEN  = 0x02;
-constexpr uint8_t BLUE   = 0x04;
-constexpr uint8_t YELLOW = 0x08;  // RED + GREEN combined, or separate yellow LED
-constexpr uint8_t ALL    = 0x0F;
+constexpr uint8_t LED_RED_FLAG    = 0x01;
+constexpr uint8_t LED_GREEN_FLAG  = 0x02;
+constexpr uint8_t LED_BLUE_FLAG   = 0x04;
+constexpr uint8_t LED_YELLOW_FLAG = 0x08;
+constexpr uint8_t LED_ALL_FLAGS   = 0x0F;
 
-//-----------------------------------------------------------------------------
 // Blink Patterns
-//-----------------------------------------------------------------------------
-enum Pattern {
-  SOLID,
-  FAST_BLINK,
-  SLOW_BLINK,
-  FADE,
-  BREATHE
+enum LEDPattern {
+  LED_SOLID,
+  LED_FAST_BLINK,
+  LED_SLOW_BLINK,
+  LED_FADE,
+  LED_BREATHE
 };
 
-//-----------------------------------------------------------------------------
-// System States (high-level, overrides individual settings)
-//-----------------------------------------------------------------------------
-enum State {
-  STATE_NONE,       // No override, use manual LED control
-  STATE_WAITING,    // Waiting for ECU - slow green blink
-  STATE_CONNECTED,  // ECU connected - fast blue blink
-  STATE_ERROR,      // Error condition - fast red blink
-  STATE_IDLE        // Idle/standby - dim green
+class LEDController {
+public:
+  LEDController();
+  
+  void setup(unsigned long updateInterval = 20);
+  bool update();
+  void selfCheck();
+  
+  void setOn(uint8_t colors);
+  void setOff(uint8_t colors);
+  void setAllOn();
+  void setAllOff();
+  void setBlink(LEDPattern pattern, uint8_t colors);
+
+private:
+  void _applyColors(uint8_t colors);
+  void _applyColorsPWM(uint8_t colors, uint8_t brightness);
+  unsigned long _getPatternInterval(LEDPattern p);
+  void _runPattern(LEDPattern pattern, uint8_t colors);
+  
+  // Individual LED update functions
+  void _updateRed();
+  void _updateGreen();
+  void _updateBlue();
+  
+  // PWM cleanup - call after using applyColorsPWM to restore digitalWrite
+  void _restoreGPIOMode();
+  
+  LEDPattern _pattern;
+  uint8_t _blinkColors;
+  uint8_t _currentColors;
+  unsigned long _lastUpdate;
+  uint8_t _fadeValue;
+  bool _fadeDirection;
+  bool _blinkState;
+  unsigned long _updateInterval;
+  unsigned long _lastModuleUpdate;
+  
+  // Per-LED timing and state
+  unsigned long _redLastUpdate;
+  unsigned long _greenLastUpdate;
+  unsigned long _blueLastUpdate;
+  bool _redState;
+  bool _greenState;
+  bool _blueState;
 };
 
-//-----------------------------------------------------------------------------
-// Public Functions
-//-----------------------------------------------------------------------------
-
-// Initialize LED pins
-void setup();
-
-// Update LED patterns (call from loop)
-void update();
-
-// Turn specific LEDs on (use OR: set_LED_on(RED | BLUE))
-void set_LED_on(uint8_t colors);
-
-// Turn specific LEDs off
-void set_LED_off(uint8_t colors);
-
-// Turn all LEDs on
-void set_all_LED_on();
-
-// Turn all LEDs off
-void set_all_LED_off();
-
-// Set blink pattern for specific LEDs
-void set_LED_blink(Pattern pattern, uint8_t colors);
-
-// Set system state (overrides individual LED settings)
-void set_LED_state(State state);
-
-// Get current state
-State get_LED_state();
-
-// Legacy compatibility
-bool isConnected();
-
-} // namespace LED
+// Global instance
+extern LEDController LED;
 
 #endif // LED_H

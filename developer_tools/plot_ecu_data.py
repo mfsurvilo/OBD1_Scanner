@@ -143,7 +143,7 @@ def main():
     
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    sample_file = os.path.join(script_dir, 'sample_data.txt')
+    sample_file = os.path.join(script_dir, '..', 'resources', 'sample_data.txt')
     
     print("Parsing sample_data.txt...")
     raw_data = parse_sample_data(sample_file)

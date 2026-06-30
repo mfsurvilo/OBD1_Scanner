@@ -1,0 +1,7 @@
+- LED startup test. Blink each one solid for .25seconds
+- standard environment in .ini file, then add what ever unique things are there for sim. 
+- wifi ota update when connected to the wifi
+- add gauges and graphs to the flask app
+- mpg calculation
+- 0-60 timer
+- flask mode for showing iphone view

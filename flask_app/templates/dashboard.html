@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBD1 Scanner Dashboard</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #333;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            color: #00d4ff;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            box-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+        }
+        
+        .status-dot.connected {
+            background: #00ff88;
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+        }
+        
+        /* Main gauges row */
+        .gauges-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        /* Large circular gauge */
+        .gauge-large {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 200px;
+        }
+        
+        .gauge-large .gauge-title {
+            font-size: 0.9rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        
+        .gauge-circle {
+            position: relative;
+            width: 160px;
+            height: 160px;
+        }
+        
+        .gauge-circle svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+        
+        .gauge-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 12;
+        }
+        
+        .gauge-fill {
+            fill: none;
+            stroke: #00d4ff;
+            stroke-width: 12;
+            stroke-linecap: round;
+            stroke-dasharray: 377;
+            stroke-dashoffset: 377;
+            transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
+        }
+        
+        .gauge-fill.warn {
+            stroke: #ffaa00;
+        }
+        
+        .gauge-fill.danger {
+            stroke: #ff4444;
+        }
+        
+        .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .gauge-value.stale {
+            color: #666;
+        }
+        
+        /* Small cards for battery/coolant */
+        .card-small {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .card-small .card-title {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .card-small .card-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .card-small .card-value.stale {
+            color: #666;
+        }
+        
+        .card-small .card-unit {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .card-small .card-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .card-small .card-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .card-bar-fill.warn {
+            background: linear-gradient(90deg, #ffaa00, #ff6600);
+        }
+        
+        .card-bar-fill.danger {
+            background: linear-gradient(90deg, #ff4444, #cc0000);
+        }
+        
+        /* Sensors tile */
+        .sensors-tile {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .sensors-tile .tile-title {
+            font-size: 1rem;
+            color: #00d4ff;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .sensors-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        
+        .sensor-item {
+            text-align: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+        }
+        
+        .sensor-item .sensor-label {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        
+        .sensor-item .sensor-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .sensor-item .sensor-value.stale {
+            color: #666;
+        }
+        
+        .sensor-item .sensor-unit {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 2px;
+        }
+        
+        /* DTC Section */
+        .dtc-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+        
+        .dtc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .dtc-title {
+            font-size: 1.2rem;
+            color: #00d4ff;
+        }
+        
+        .dtc-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .dtc-badge.ok {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+        
+        .dtc-badge.error {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+        }
+        
+        .dtc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .dtc-list h3 {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        
+        .dtc-code {
+            background: rgba(255, 68, 68, 0.1);
+            border-left: 3px solid #ff4444;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .dtc-code.stored {
+            background: rgba(255, 170, 0, 0.1);
+            border-color: #ffaa00;
+        }
+        
+        .dtc-empty {
+            color: #555;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .gauges-row {
+                justify-content: center;
+            }
+            
+            .sensors-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .dtc-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sensors-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        /* Settings Panel */
+        .settings-btn {
+            background: rgba(0, 212, 255, 0.2);
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            margin-right: 16px;
+        }
+        
+        .settings-btn:hover {
+            background: rgba(0, 212, 255, 0.3);
+        }
+        
+        .settings-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 400px;
+            max-width: 90vw;
+            height: 100vh;
+            background: #1a1a2e;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .settings-panel.open {
+            display: block;
+        }
+        
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .settings-header h2 {
+            color: #00d4ff;
+            font-size: 1.2rem;
+        }
+        
+        .settings-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+        
+        .settings-close:hover {
+            color: #fff;
+        }
+        
+        .scaling-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .scaling-item .param-name {
+            font-size: 0.85rem;
+            color: #00d4ff;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .scaling-inputs {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .scaling-field {
+            flex: 1;
+        }
+        
+        .scaling-field label {
+            display: block;
+            font-size: 0.7rem;
+            color: #888;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        
+        .scaling-field input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .scaling-field input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        .settings-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-save {
+            flex: 1;
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            border: none;
+            color: #1a1a2e;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-save:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-save:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-reset {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-reset:hover {
+            background: rgba(255, 68, 68, 0.3);
+        }
+        
+        .settings-message {
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        
+        .settings-message.success {
+            display: block;
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+        
+        .settings-message.error {
+            display: block;
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+        
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        
+        .overlay.open {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>OBD1 Scanner Dashboard</h1>
+        <div class="status">
+            <button class="settings-btn" id="settings-btn">⚙ Settings</button>
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Disconnected</span>
+        </div>
+    </header>
+    
+    <!-- Settings Panel Overlay -->
+    <div class="overlay" id="settings-overlay"></div>
+    
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+            <h2>Parameter Scaling</h2>
+            <button class="settings-close" id="settings-close">×</button>
+        </div>
+        <div id="scaling-list">
+            <!-- Scaling items will be generated by JS -->
+        </div>
+        <div class="settings-actions">
+            <button class="btn-save" id="btn-save-scaling">Save to Device</button>
+            <button class="btn-reset" id="btn-reset-scaling">Reset</button>
+        </div>
+        <div class="settings-message" id="settings-message"></div>
+    </div>
+    
+    <!-- Main gauges row: RPM, Speed, Battery, Coolant -->
+    <div class="gauges-row">
+        <!-- RPM Gauge -->
+        <div class="gauge-large">
+            <span class="gauge-title">RPM</span>
+            <div class="gauge-circle">
+                <svg viewBox="0 0 160 160">
+                    <circle class="gauge-bg" cx="80" cy="80" r="60"></circle>
+                    <circle class="gauge-fill" id="gauge-EngineSpeed" cx="80" cy="80" r="60"></circle>
+                </svg>
+                <div class="gauge-value stale" id="value-EngineSpeed">--</div>
+            </div>
+        </div>
+        
+        <!-- Speed Gauge -->
+        <div class="gauge-large">
+            <span class="gauge-title">Speed</span>
+            <div class="gauge-circle">
+                <svg viewBox="0 0 160 160">
+                    <circle class="gauge-bg" cx="80" cy="80" r="60"></circle>
+                    <circle class="gauge-fill" id="gauge-VehicleSpeed" cx="80" cy="80" r="60"></circle>
+                </svg>
+                <div class="gauge-value stale" id="value-VehicleSpeed">--</div>
+            </div>
+        </div>
+        
+        <!-- Battery Voltage -->
+        <div class="card-small">
+            <span class="card-title">Battery</span>
+            <div class="card-value stale" id="value-BatteryVoltage">--</div>
+            <span class="card-unit">Volts</span>
+            <div class="card-bar">
+                <div class="card-bar-fill" id="bar-BatteryVoltage"></div>
+            </div>
+        </div>
+        
+        <!-- Coolant Temperature -->
+        <div class="card-small">
+            <span class="card-title">Coolant</span>
+            <div class="card-value stale" id="value-CoolantTemp">--</div>
+            <span class="card-unit">°F</span>
+            <div class="card-bar">
+                <div class="card-bar-fill" id="bar-CoolantTemp"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sensors Tile -->
+    <div class="sensors-tile">
+        <div class="tile-title">Sensors</div>
+        <div class="sensors-grid">
+            <div class="sensor-item">
+                <div class="sensor-label">AF Corr</div>
+                <div class="sensor-value stale" id="value-AFCorrection">--</div>
+                <div class="sensor-unit">%</div>
+            </div>
+            <div class="sensor-item">
+                <div class="sensor-label">Throttle</div>
+                <div class="sensor-value stale" id="value-ThrottlePosition">--</div>
+                <div class="sensor-unit">V</div>
+            </div>
+            <div class="sensor-item">
+                <div class="sensor-label">O2</div>
+                <div class="sensor-value stale" id="value-O2Average">--</div>
+                <div class="sensor-unit">V</div>
+            </div>
+            <div class="sensor-item">
+                <div class="sensor-label">Timing</div>
+                <div class="sensor-value stale" id="value-IgnitionAdvance">--</div>
+                <div class="sensor-unit">°BTDC</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="dtc-section">
+        <div class="dtc-header">
+            <span class="dtc-title">Trouble Codes</span>
+            <span class="dtc-badge ok" id="dtc-badge">No Codes</span>
+        </div>
+        <div class="dtc-grid">
+            <div class="dtc-list">
+                <h3>Active</h3>
+                <div id="dtc-active"><span class="dtc-empty">None</span></div>
+            </div>
+            <div class="dtc-list">
+                <h3>Stored</h3>
+                <div id="dtc-stored"><span class="dtc-empty">None</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        // Scaling state - don't show data until scaling is loaded
+        let scalingReady = false;
+        let scalingFactors = {};
+        
+        // Gauge configuration with custom ranges
+        const gaugeConfig = {
+            'EngineSpeed': { min: 0, max: 6000, warnAt: 5000, dangerAt: 5500 },
+            'VehicleSpeed': { min: 0, max: 180 },
+            'BatteryVoltage': { min: 10, max: 16, warnAt: 11.5, dangerAt: 11, invert: true },
+            'CoolantTemp': { min: -40, max: 280, warnAt: 220, dangerAt: 250 },
+            'AFCorrection': { min: -100, max: 100 },
+            'ThrottlePosition': { min: 0, max: 5 },
+            'O2Average': { min: 0, max: 5 },
+            'IgnitionAdvance': { min: 0, max: 60 }
+        };
+        
+        // Circumference of gauge circle (2 * PI * r where r=60)
+        const GAUGE_CIRCUMFERENCE = 377;
+        
+        function updateCircularGauge(param, value) {
+            const gaugeEl = document.getElementById(`gauge-${param}`);
+            if (!gaugeEl) return;
+            
+            const config = gaugeConfig[param] || { min: 0, max: 100 };
+            const percent = Math.min(1, Math.max(0, (value - config.min) / (config.max - config.min)));
+            const offset = GAUGE_CIRCUMFERENCE * (1 - percent);
+            
+            gaugeEl.style.strokeDashoffset = offset;
+            
+            // Warning/danger colors
+            gaugeEl.classList.remove('warn', 'danger');
+            if (config.invert) {
+                if (config.dangerAt && value <= config.dangerAt) {
+                    gaugeEl.classList.add('danger');
+                } else if (config.warnAt && value <= config.warnAt) {
+                    gaugeEl.classList.add('warn');
+                }
+            } else {
+                if (config.dangerAt && value >= config.dangerAt) {
+                    gaugeEl.classList.add('danger');
+                } else if (config.warnAt && value >= config.warnAt) {
+                    gaugeEl.classList.add('warn');
+                }
+            }
+        }
+        
+        function updateBarGauge(param, value) {
+            const barEl = document.getElementById(`bar-${param}`);
+            if (!barEl) return;
+            
+            const config = gaugeConfig[param] || { min: 0, max: 100 };
+            const percent = Math.min(100, Math.max(0, ((value - config.min) / (config.max - config.min)) * 100));
+            barEl.style.width = `${percent}%`;
+            
+            // Warning/danger colors
+            barEl.classList.remove('warn', 'danger');
+            if (config.invert) {
+                if (config.dangerAt && value <= config.dangerAt) {
+                    barEl.classList.add('danger');
+                } else if (config.warnAt && value <= config.warnAt) {
+                    barEl.classList.add('warn');
+                }
+            } else {
+                if (config.dangerAt && value >= config.dangerAt) {
+                    barEl.classList.add('danger');
+                } else if (config.warnAt && value >= config.warnAt) {
+                    barEl.classList.add('warn');
+                }
+            }
+        }
+        
+        // Apply scaling to a raw value
+        function applyScaling(param, rawValue) {
+            const factor = scalingFactors[param];
+            if (factor) {
+                return (rawValue * factor.multiplier) + factor.offset;
+            }
+            return rawValue;
+        }
+        
+        function updateValue(param, rawValue) {
+            if (!scalingReady) return;  // Don't display until scaling loaded
+            
+            const valueEl = document.getElementById(`value-${param}`);
+            if (!valueEl) return;
+            
+            // Apply scaling
+            const value = applyScaling(param, rawValue);
+            
+            // Format based on parameter type
+            let displayValue;
+            if (param === 'EngineSpeed') {
+                displayValue = Math.round(value);
+            } else if (param === 'VehicleSpeed') {
+                displayValue = Math.round(value);
+            } else if (Math.abs(value) < 10) {
+                displayValue = value.toFixed(2);
+            } else {
+                displayValue = value.toFixed(1);
+            }
+            
+            valueEl.textContent = displayValue;
+            valueEl.classList.remove('stale');
+            
+            // Update gauges
+            updateCircularGauge(param, value);
+            updateBarGauge(param, value);
+        }
+        
+        // Load scaling factors and mark ready
+        async function initScaling() {
+            try {
+                const response = await fetch('/api/scaling');
+                if (response.ok) {
+                    const data = await response.json();
+                    scalingFactors = {};
+                    if (data.scaling) {
+                        data.scaling.forEach(s => {
+                            scalingFactors[s.name] = {
+                                multiplier: s.multiplier || 1.0,
+                                offset: s.offset || 0.0
+                            };
+                        });
+                    }
+                }
+            } catch (err) {
+                console.log('Could not load scaling, using defaults');
+            }
+            scalingReady = true;
+            console.log('Scaling ready:', scalingFactors);
+        }
+        
+        // Initialize scaling on page load
+        initScaling();
+        
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+        
+        socket.on('connection_status', (data) => {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            
+            if (data.connected) {
+                dot.classList.add('connected');
+                text.textContent = data.port || 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = data.error || 'Disconnected';
+            }
+        });
+        
+        socket.on('data_update', (data) => {
+            const param = data.param;
+            const value = data.value;
+            
+            if (typeof value === 'number') {
+                updateValue(param, value);
+            }
+        });
+        
+        socket.on('current_values', (data) => {
+            for (const [param, info] of Object.entries(data)) {
+                if (!info || typeof info.value !== 'number') continue;
+                updateValue(param, info.value);
+            }
+        });
+        
+        socket.on('dtc_update', (data) => {
+            const badge = document.getElementById('dtc-badge');
+            const activeEl = document.getElementById('dtc-active');
+            const storedEl = document.getElementById('dtc-stored');
+            
+            const totalCodes = (data.active?.length || 0) + (data.stored?.length || 0);
+            
+            if (totalCodes > 0) {
+                badge.className = 'dtc-badge error';
+                badge.textContent = `${totalCodes} Code${totalCodes > 1 ? 's' : ''}`;
+            } else {
+                badge.className = 'dtc-badge ok';
+                badge.textContent = 'No Codes';
+            }
+            
+            // Active codes
+            if (data.active && data.active.length > 0) {
+                activeEl.innerHTML = data.active.map(dtc => 
+                    `<div class="dtc-code">${dtc.code}: ${dtc.description || dtc.name || 'Unknown'}</div>`
+                ).join('');
+            } else {
+                activeEl.innerHTML = '<span class="dtc-empty">None</span>';
+            }
+            
+            // Stored codes
+            if (data.stored && data.stored.length > 0) {
+                storedEl.innerHTML = data.stored.map(dtc => 
+                    `<div class="dtc-code stored">${dtc.code}: ${dtc.description || dtc.name || 'Unknown'}</div>`
+                ).join('');
+            } else {
+                storedEl.innerHTML = '<span class="dtc-empty">None</span>';
+            }
+        });
+        
+        // =========================================================================
+        // Settings Panel - Parameter Scaling
+        // =========================================================================
+        
+        // All available parameters for scaling
+        const allParameters = [
+            'BatteryVoltage', 'VehicleSpeed', 'EngineSpeed', 'CoolantTemp',
+            'IgnitionAdvance', 'AirflowSensor', 'EngineLoad', 'ThrottlePosition',
+            'InjectorPulseWidth', 'ISUDutyValve', 'O2Average', 'KnockCorrection',
+            'AFCorrection', 'AtmosphericPressure', 'ManifoldPressure', 'BoostSolenoidDutyCycle'
+        ];
+        
+        // Settings panel elements
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsPanel = document.getElementById('settings-panel');
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const settingsClose = document.getElementById('settings-close');
+        const scalingList = document.getElementById('scaling-list');
+        const btnSave = document.getElementById('btn-save-scaling');
+        const btnReset = document.getElementById('btn-reset-scaling');
+        const settingsMessage = document.getElementById('settings-message');
+        
+        // Open settings panel
+        function openSettings() {
+            settingsPanel.classList.add('open');
+            settingsOverlay.classList.add('open');
+            loadScalingFactors();
+        }
+        
+        // Close settings panel
+        function closeSettings() {
+            settingsPanel.classList.remove('open');
+            settingsOverlay.classList.remove('open');
+            settingsMessage.className = 'settings-message';
+            settingsMessage.textContent = '';
+        }
+        
+        // Load scaling factors from device
+        async function loadScalingFactors() {
+            try {
+                const response = await fetch('/api/scaling');
+                if (response.ok) {
+                    const data = await response.json();
+                    scalingFactors = {};
+                    if (data.scaling) {
+                        data.scaling.forEach(s => {
+                            scalingFactors[s.name] = {
+                                multiplier: s.multiplier || 1.0,
+                                offset: s.offset || 0.0
+                            };
+                        });
+                    }
+                    renderScalingList();
+                } else {
+                    showSettingsMessage('Failed to load scaling factors', 'error');
+                }
+            } catch (err) {
+                console.error('Error loading scaling:', err);
+                showSettingsMessage('Could not connect to device', 'error');
+                // Show defaults anyway
+                renderScalingList();
+            }
+        }
+        
+        // Render the scaling list
+        function renderScalingList() {
+            scalingList.innerHTML = allParameters.map(param => {
+                const factor = scalingFactors[param] || { multiplier: 1.0, offset: 0.0 };
+                return `
+                    <div class="scaling-item" data-param="${param}">
+                        <div class="param-name">${param}</div>
+                        <div class="scaling-inputs">
+                            <div class="scaling-field">
+                                <label>Multiplier</label>
+                                <input type="number" step="0.001" value="${factor.multiplier}" 
+                                       class="input-multiplier" data-param="${param}">
+                            </div>
+                            <div class="scaling-field">
+                                <label>Offset</label>
+                                <input type="number" step="0.1" value="${factor.offset}" 
+                                       class="input-offset" data-param="${param}">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Save scaling factors to device
+        async function saveScalingFactors() {
+            btnSave.disabled = true;
+            btnSave.textContent = 'Saving...';
+            
+            // Collect values from inputs
+            const scaling = [];
+            allParameters.forEach(param => {
+                const multInput = document.querySelector(`.input-multiplier[data-param="${param}"]`);
+                const offInput = document.querySelector(`.input-offset[data-param="${param}"]`);
+                if (multInput && offInput) {
+                    const mult = parseFloat(multInput.value) || 1.0;
+                    const off = parseFloat(offInput.value) || 0.0;
+                    // Only include if not default
+                    if (mult !== 1.0 || off !== 0.0) {
+                        scaling.push({ name: param, multiplier: mult, offset: off });
+                    }
+                }
+            });
+            
+            try {
+                const response = await fetch('/api/scaling', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scaling })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'saved') {
+                    showSettingsMessage('Scaling factors saved to device!', 'success');
+                    // Update local cache
+                    scalingFactors = {};
+                    scaling.forEach(s => {
+                        scalingFactors[s.name] = { multiplier: s.multiplier, offset: s.offset };
+                    });
+                } else {
+                    showSettingsMessage(data.message || 'Failed to save', 'error');
+                }
+            } catch (err) {
+                console.error('Error saving scaling:', err);
+                showSettingsMessage('Could not connect to device', 'error');
+            }
+            
+            btnSave.disabled = false;
+            btnSave.textContent = 'Save to Device';
+        }
+        
+        // Reset all scaling to defaults
+        function resetScaling() {
+            allParameters.forEach(param => {
+                const multInput = document.querySelector(`.input-multiplier[data-param="${param}"]`);
+                const offInput = document.querySelector(`.input-offset[data-param="${param}"]`);
+                if (multInput) multInput.value = '1';
+                if (offInput) offInput.value = '0';
+            });
+            scalingFactors = {};
+            showSettingsMessage('Reset to defaults (not saved yet)', 'success');
+        }
+        
+        // Show message in settings panel
+        function showSettingsMessage(msg, type) {
+            settingsMessage.textContent = msg;
+            settingsMessage.className = `settings-message ${type}`;
+            setTimeout(() => {
+                settingsMessage.className = 'settings-message';
+            }, 5000);
+        }
+        
+        // Event listeners
+        settingsBtn.addEventListener('click', openSettings);
+        settingsClose.addEventListener('click', closeSettings);
+        settingsOverlay.addEventListener('click', closeSettings);
+        btnSave.addEventListener('click', saveScalingFactors);
+        btnReset.addEventListener('click', resetScaling);
+        
+        // Load scaling on connect
+        socket.on('scaling_config', (data) => {
+            if (data.scaling) {
+                scalingFactors = {};
+                data.scaling.forEach(s => {
+                    scalingFactors[s.name] = {
+                        multiplier: s.multiplier || 1.0,
+                        offset: s.offset || 0.0
+                    };
+                });
+            }
+        });
+    </script>
+</body>
+</html>
