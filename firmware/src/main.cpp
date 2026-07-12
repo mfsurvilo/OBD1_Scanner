@@ -17,7 +17,7 @@
 #include "web_server.h"
 
 // Status-LED heartbeat color.
-#define BLINK_LED LED_BLUE
+#define BLINK_LED LED_GREEN
 
 // Common-anode RGB helper: `on` lights the color (drives the pin LOW).
 static inline void ledWrite(uint8_t pin, bool on) {

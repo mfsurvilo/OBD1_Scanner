@@ -25,13 +25,17 @@ Heartbeat LED is **green**.
   shippable firmware (`env:obd1`). Dropped the `FW_VARIANT` build identity and
   the `/status.variant` field.
 - Reworked over-the-air updates: the **Update now** button pulls `firmware.bin`
-  (app) and `filesystem.bin` (LittleFS/PWA) separately from the latest GitHub
-  release and flashes both. Retired the `.ota` combined-container format and the
+  (app) and `filesystem.bin` (LittleFS/PWA) separately from the newest release
+  and flashes both. Retired the `.ota` combined-container format and the
   `/update/combined` endpoint.
+- The update check lists all releases and picks the **highest version number**
+  itself, rather than trusting GitHub's `/releases/latest` (which orders by the
+  release's creation date and can point at the wrong version). The pull then
+  fetches that version's assets by explicit tag.
 - Release assets now have stable names (`firmware.bin`, `filesystem.bin`,
   `factory.bin`); the git tag carries the version.
 
 ### PWA
-- Removed the manual `.ota` upload card; the primary path is the internet
-  **Update now** button. Manual `.bin` flashing moved under an “advanced” panel.
+- Removed the manual `.ota`/`.bin` upload cards entirely; updating is the
+  one-button internet **Update now** flow.
 - Dropped the red/green variant color theming and the Firmware/variant status row.

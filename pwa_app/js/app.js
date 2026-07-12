@@ -4,8 +4,9 @@
 // Talks to the firmware served from the device:
 //   GET  /status              -> device status JSON
 //   WS   :81                  -> same JSON, pushed ~1 Hz (heartbeat)
-//   POST /update/firmware     -> OTA the app image
-//   POST /update/filesystem   -> OTA this PWA
+//   POST /wifi                 -> save home-Wi-Fi credentials
+//   GET  /update/check         -> is a newer release available?
+//   POST /update/pull          -> download + flash the newest release
 //=============================================================================
 
 // The app is served from the device, so talk to whoever served it. Fall back
@@ -75,50 +76,11 @@ connectWs();
 pollStatus();
 setInterval(pollStatus, 3000);  // fallback / initial fill if WS is down
 
-// --- OTA upload -------------------------------------------------------------
-function upload(endpoint, fileEl, btn, bar, msg) {
-  const file = fileEl.files[0];
-  if (!file) { setMsg(msg, 'Choose a .bin file first.', 'bad'); return; }
-
-  btn.disabled = true;
-  setMsg(msg, 'Uploading…', '');
-  bar.style.width = '0%';
-
-  const form = new FormData();
-  form.append('file', file, file.name);
-
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', `${API}${endpoint}`);
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) bar.style.width = `${(e.loaded / e.total * 100).toFixed(0)}%`;
-  };
-  xhr.onload = () => {
-    btn.disabled = false;
-    if (xhr.status === 200) {
-      bar.style.width = '100%';
-      setMsg(msg, 'Update applied — device rebooting. Reconnect in ~10 s.', 'ok');
-    } else {
-      setMsg(msg, `Failed (HTTP ${xhr.status}). ${xhr.responseText || ''}`, 'bad');
-    }
-  };
-  xhr.onerror = () => {
-    btn.disabled = false;
-    // A firmware update can drop the socket as the device reboots — that's
-    // usually success, not failure.
-    setMsg(msg, 'Connection closed. If flashing firmware, this is normal — device is rebooting.', 'ok');
-  };
-  xhr.send(form);
-}
-
+// --- message helper ---------------------------------------------------------
 function setMsg(el, text, cls) {
   el.textContent = text;
   el.className = `msg ${cls}`;
 }
-
-$('fw-btn').addEventListener('click', () =>
-  upload('/update/firmware', $('fw-file'), $('fw-btn'), $('fw-bar'), $('fw-msg')));
-$('fs-btn').addEventListener('click', () =>
-  upload('/update/filesystem', $('fs-file'), $('fs-btn'), $('fs-bar'), $('fs-msg')));
 
 // --- Wi-Fi provisioning + internet pull-OTA ---------------------------------
 $('wifi-form').addEventListener('submit', async (e) => {

@@ -260,33 +260,59 @@ void WebServerClass::handleWifiPost() {
 }
 
 //=============================================================================
-// Internet update: version check + pull-OTA from the latest GitHub release
+// Internet update: version check + pull-OTA from the highest-versioned release
+//
+// We deliberately do NOT use GitHub's /releases/latest — it picks "latest" by
+// the release's created_at timestamp, which is unreliable when releases are
+// created out of order (e.g. two tags pushed together). Instead we list all
+// releases and pick the highest version number ourselves.
 //
 // TLS uses setInsecure() (no certificate validation) for simplicity. For a
 // hardened build, pin GitHub's CA instead.
 //=============================================================================
+
+// Pack a "vMAJOR.MINOR.PATCH" tag into a comparable integer (missing parts = 0).
+static long versionKey(const String& tag) {
+  const char* s = tag.c_str();
+  if (*s == 'v' || *s == 'V') s++;
+  int maj = 0, min = 0, pat = 0;
+  sscanf(s, "%d.%d.%d", &maj, &min, &pat);
+  return (long)maj * 1000000L + (long)min * 1000L + pat;
+}
+
 bool WebServerClass::fetchLatestTag(String& tag) {
   if (WiFi.status() != WL_CONNECTED) return false;
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
   http.setTimeout(15000);
-  String url = String("https://api.github.com/repos/") + GH_REPO + "/releases/latest";
+  String url = String("https://api.github.com/repos/") + GH_REPO + "/releases?per_page=30";
   if (!http.begin(client, url)) return false;
   http.addHeader("User-Agent", "obd1-scanner");   // GitHub API requires this
   http.addHeader("Accept", "application/vnd.github+json");
   int code = http.GET();
   if (code != HTTP_CODE_OK) { http.end(); return false; }
-  // Filter the (large) response down to just tag_name.
+  // Filter the (large) array response down to the fields we need per element.
   JsonDocument filter;
-  filter["tag_name"] = true;
+  JsonObject f = filter.add<JsonObject>();
+  f["tag_name"]   = true;
+  f["draft"]      = true;
+  f["prerelease"] = true;
   JsonDocument doc;
   DeserializationError e =
       deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
   http.end();
   if (e) return false;
-  tag = doc["tag_name"].as<String>();
-  return !tag.isEmpty();
+
+  long best = -1;
+  for (JsonObject r : doc.as<JsonArray>()) {
+    if ((r["draft"] | false) || (r["prerelease"] | false)) continue;
+    String t = r["tag_name"].as<String>();
+    if (t.isEmpty()) continue;
+    long k = versionKey(t);
+    if (k > best) { best = k; tag = t; }
+  }
+  return best >= 0;
 }
 
 void WebServerClass::handleUpdateCheck() {
@@ -375,10 +401,16 @@ void WebServerClass::handleUpdatePull() {
                "{\"ok\":false,\"msg\":\"device is not connected to the internet\"}");
     return;
   }
-  // Stable /latest/download URLs — the release publishes firmware.bin (app) and
-  // filesystem.bin (LittleFS/PWA) under fixed names, so the tag need not appear.
+  // Resolve the highest-versioned release, then pull its assets by explicit tag
+  // (not /releases/latest, whose ordering is unreliable — see fetchLatestTag).
+  String tag;
+  if (!fetchLatestTag(tag)) {
+    _http.send(500, "application/json",
+               "{\"ok\":false,\"msg\":\"could not find the latest release\"}");
+    return;
+  }
   const String base = String("https://github.com/") + GH_REPO +
-                      "/releases/latest/download/";
+                      "/releases/download/" + tag + "/";
   String err;
 
   Serial.printf("[ota] pulling %sfirmware.bin\n", base.c_str());

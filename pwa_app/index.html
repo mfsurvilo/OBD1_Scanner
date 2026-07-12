@@ -53,26 +53,6 @@
         <p id="pull-msg" class="msg"></p>
       </div>
     </section>
-
-    <!-- Manual .bin flashing (developer / recovery aid) -->
-    <details class="card">
-      <summary><strong>Manual update</strong> (advanced)</summary>
-      <p class="hint" style="margin-top:10px">Flash a firmware or app image
-        directly from a <code>.bin</code> file. Most users should use
-        <em>“Update now”</em> above instead.</p>
-
-      <p class="hint" style="margin-bottom:6px">Firmware (app image):</p>
-      <input type="file" id="fw-file" accept=".bin">
-      <button id="fw-btn" class="btn">Flash firmware</button>
-      <div class="progress"><div id="fw-bar" class="bar"></div></div>
-      <p id="fw-msg" class="msg"></p>
-
-      <p class="hint" style="margin:14px 0 6px">App (LittleFS/PWA image):</p>
-      <input type="file" id="fs-file" accept=".bin">
-      <button id="fs-btn" class="btn btn-alt">Flash app</button>
-      <div class="progress"><div id="fs-bar" class="bar"></div></div>
-      <p id="fs-msg" class="msg"></p>
-    </details>
   </main>
 
   <footer><span id="foot">OBD1 Scanner console</span></footer>
