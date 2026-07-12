@@ -9,6 +9,8 @@ Lock the release contracts that let any version flash/update any other:
 - `test_partition_layout.py` — OTA partition offsets/sizes are frozen (golden copy).
 - `test_api_contract.py` — `/update/*` endpoints, `/status` keys, rollback wiring.
 - `test_image_sizes.py` — built app/fs fit their partitions (skips if not built).
+- `test_release_contract.py` — `versions.json` sanity + the asset filenames agree
+  across the firmware OTA, `build_release.sh`, and `release.yml`.
 
 Run:
 

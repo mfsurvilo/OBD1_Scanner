@@ -5,11 +5,18 @@ name: pages
 # release assets aren't served with CORS headers (so ESP Web Tools can't fetch
 # them cross-origin), so this workflow mirrors each listed version's factory.bin
 # onto the Pages origin under fw/<tag>-factory.bin. No firmware build needed.
-# Triggered on pushes to master (the github-pages environment allows the default
-# branch).
+#
+# Triggers:
+#   - push to master        (the github-pages environment allows the default branch)
+#   - after a `release` run  (workflow_run) — so the mirror re-runs once the
+#     release assets exist, closing the race where a same-time master push would
+#     mirror the pre-build (stale) factory.bin.
 on:
   push:
     branches: [master]
+  workflow_run:
+    workflows: [release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +31,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # When chained off a release run, only proceed if that release succeeded.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - name: Stage Pages site
