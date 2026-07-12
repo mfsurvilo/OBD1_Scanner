@@ -35,8 +35,10 @@ Release by CI — never committed.
 1. **Developer USB** — `cd ../firmware && ./upload.sh` (one combined pio command).
 2. **End-user USB (recovery)** — the `flasher/` page. Hosted on Pages over HTTPS
    (Web Serial needs https or localhost).
-3. **OTA (Wi-Fi)** — the device PWA's "Update now" button → `/update/pull`, which
-   pulls `firmware.bin` + `filesystem.bin` from the latest Release.
+3. **OTA (Wi-Fi)** — the device PWA's "Update now" button → `/update/pull`. The
+   firmware lists the repo's releases, picks the highest version number (not
+   GitHub's date-ordered `/releases/latest`), and pulls that release's
+   `firmware.bin` + `filesystem.bin` by explicit tag.
 
 ## Local preview
 
