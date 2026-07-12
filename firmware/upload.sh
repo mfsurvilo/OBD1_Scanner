@@ -7,20 +7,20 @@
 # so the PWA in pwa_app/ is the single source of truth.
 #
 # Usage:
-#   ./upload.sh              # uses the "blink_red" environment
-#   ./upload.sh blink_green  # override the environment
-#   ENV=blink_green ./upload.sh   # or via the ENV variable
+#   ./upload.sh              # uses the "obd1" environment
+#   ./upload.sh badhealth    # override the environment (test builds)
+#   ENV=badhealth ./upload.sh   # or via the ENV variable
 #
 # The other two flashing methods:
-#   - End users, USB backup : ../firmware_server/flasher/  (browser / .exe)
-#   - Over the air (Wi-Fi)  : the PWA's "Combined update (.ota)" form
+#   - End users, USB recovery : ../firmware_server/flasher/  (browser)
+#   - Over the air (Wi-Fi)     : the PWA's "Update now" button
 
 set -euo pipefail
 
 # Run from this script's directory so pio finds platformio.ini.
 cd "$(dirname "$0")"
 
-ENV="${1:-${ENV:-blink_red}}"
+ENV="${1:-${ENV:-obd1}}"
 
 echo "==> Flashing firmware + filesystem over USB (env: $ENV)"
 # One combined pio invocation: uploadfs (LittleFS image) + upload (app) together.

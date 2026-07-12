@@ -11,14 +11,14 @@ VERSION_H = (FW / "include" / "version.h")
 def test_ota_endpoints_present():
     src = CPP.read_text()
     for route in ("/status", "/update/firmware", "/update/filesystem",
-                  "/update/combined"):
+                  "/update/check", "/update/pull"):
         assert route in src, f"missing endpoint {route}"
 
 
 def test_status_keys_present():
     src = CPP.read_text()
     # Keys that tooling / regression round-trip rely on.
-    for key in ("name", "variant", "version", "commit",
+    for key in ("name", "version", "commit",
                 "uptime_ms", "partition", "ota_confirmed"):
         assert f'doc["{key}"]' in src, f"missing /status key {key}"
 
@@ -26,7 +26,6 @@ def test_status_keys_present():
 def test_version_identifiers_present():
     h = VERSION_H.read_text()
     assert "FW_VERSION" in h
-    assert "FW_VARIANT" in h
 
 
 def test_rollback_wired_in():

@@ -5,9 +5,6 @@
 //   - blinkTask : status-LED heartbeat (proof the scheduler is alive), core 1.
 //   - netTask   : AP + HTTP/WebSocket server + OTA update, core 0.
 //
-// The blink color is picked at build time (BLINK_LED) so the two sample
-// firmwares — env:blink_red and env:blink_green — differ only in that flag.
-//
 // Upload firmware & PWA:
 //   USB : ./upload.sh              (firmware via esptool + LittleFS via uploadfs)
 //   WiFi: join AP "OBD1_Scanner", open http://obd1.local, use the OTA form,
@@ -19,11 +16,8 @@
 #include "pin_defs.h"
 #include "web_server.h"
 
-// Blink color for this build. Overridden per-env in platformio.ini; defaults
-// to blue for a plain `pio run` outside the sample envs.
-#ifndef BLINK_LED
-#define BLINK_LED LED_BLUE
-#endif
+// Status-LED heartbeat color.
+#define BLINK_LED LED_GREEN
 
 // Common-anode RGB helper: `on` lights the color (drives the pin LOW).
 static inline void ledWrite(uint8_t pin, bool on) {
@@ -74,7 +68,7 @@ static void confirmHealthIfPending() {
   }
 
 #ifdef FORCE_UNHEALTHY
-  // Fault-injection build (env:blink_badhealth) ONLY: never confirm, and after
+  // Fault-injection build (env:badhealth) ONLY: never confirm, and after
   // a grace period actively roll back to prove auto-revert works. The HIL test
   // guarantees a valid previous slot, so this can't loop. Never ship this.
   if (millis() > 8000) {
@@ -95,8 +89,8 @@ static void confirmHealthIfPending() {
 void setup() {
   Serial.begin(DEBUG_BAUD);
   delay(300);
-  Serial.printf("\n%s %s [%s] (%s)\nbuilt %s\n",
-                FW_NAME, FW_VERSION, FW_VARIANT, FW_GIT_COMMIT, FW_BUILD_DATE);
+  Serial.printf("\n%s %s (%s)\nbuilt %s\n",
+                FW_NAME, FW_VERSION, FW_GIT_COMMIT, FW_BUILD_DATE);
 
   xTaskCreatePinnedToCore(blinkTask, "blink", 2048, nullptr, 1, nullptr, 1);
   // 16 KB stack: the internet pull-OTA does a TLS handshake (mbedTLS) which

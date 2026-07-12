@@ -23,7 +23,6 @@
       <h2>Device status</h2>
       <dl class="kv">
         <dt>Link</dt>       <dd id="s-link">connecting…</dd>
-        <dt>Firmware</dt>   <dd id="s-variant">—</dd>
         <dt>Version</dt>    <dd id="s-version">—</dd>
         <dt>Build</dt>      <dd id="s-build">—</dd>
         <dt>Commit</dt>     <dd id="s-commit">—</dd>
@@ -55,37 +54,25 @@
       </div>
     </section>
 
-    <!-- OTA: one .ota file flashes firmware + app together -->
-    <section class="card">
-      <h2>Combined update (.ota)</h2>
-      <p class="hint">Flash firmware <em>and</em> app from a single
-        <code>.ota</code> file. The device reboots once when done.</p>
-      <input type="file" id="ota-file" accept=".ota">
-      <button id="ota-btn" class="btn">Flash firmware + app</button>
-      <div class="progress"><div id="ota-bar" class="bar"></div></div>
-      <p id="ota-msg" class="msg"></p>
-    </section>
+    <!-- Manual .bin flashing (developer / recovery aid) -->
+    <details class="card">
+      <summary><strong>Manual update</strong> (advanced)</summary>
+      <p class="hint" style="margin-top:10px">Flash a firmware or app image
+        directly from a <code>.bin</code> file. Most users should use
+        <em>“Update now”</em> above instead.</p>
 
-    <!-- OTA: flash a .bin downloaded to the phone -->
-    <section class="card">
-      <h2>Firmware update</h2>
-      <p class="hint">Pick a firmware <code>.bin</code> and flash it. The device
-        reboots when done.</p>
+      <p class="hint" style="margin-bottom:6px">Firmware (app image):</p>
       <input type="file" id="fw-file" accept=".bin">
       <button id="fw-btn" class="btn">Flash firmware</button>
       <div class="progress"><div id="fw-bar" class="bar"></div></div>
       <p id="fw-msg" class="msg"></p>
-    </section>
 
-    <section class="card">
-      <h2>App (PWA) update</h2>
-      <p class="hint">Flash a LittleFS image <code>.bin</code> to update this web
-        app itself.</p>
+      <p class="hint" style="margin:14px 0 6px">App (LittleFS/PWA image):</p>
       <input type="file" id="fs-file" accept=".bin">
       <button id="fs-btn" class="btn btn-alt">Flash app</button>
       <div class="progress"><div id="fs-bar" class="bar"></div></div>
       <p id="fs-msg" class="msg"></p>
-    </section>
+    </details>
   </main>
 
   <footer><span id="foot">OBD1 Scanner console</span></footer>

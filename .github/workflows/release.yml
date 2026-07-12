@@ -1,11 +1,13 @@
 name: release
 
-# On a version tag: build both firmwares, package every image, and publish the
-# binaries (.bin/.ota) to a GitHub Release. (Pages is deployed separately by
-# pages.yml on master pushes, which the github-pages environment allows.)
+# On a version tag: build the firmware, package the images, and publish them to
+# a GitHub Release. Assets have stable names (the tag carries the version):
+#   firmware.bin    app image      (OTA: pulled by the "Update now" button)
+#   filesystem.bin  LittleFS / PWA (OTA: pulled by the "Update now" button)
+#   factory.bin     full flash     (USB recovery via the flasher page)
 #
 # Cut a release with:
-#   git tag v0.2.0 && git push origin v0.2.0
+#   git tag v0.5 && git push origin v0.5
 on:
   push:
     tags: ["v*"]
@@ -35,13 +37,14 @@ jobs:
 
       - run: pip install platformio esptool
 
-      - name: Build + package all images
-        run: bash firmware/build_firmwares.sh
+      - name: Build + package release images
+        run: bash firmware/build_release.sh
 
       - name: Publish Release binaries
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            firmware_server/firmware/*.bin
-            firmware_server/firmware/*.ota
+            firmware_server/firmware/firmware.bin
+            firmware_server/firmware/filesystem.bin
+            firmware_server/firmware/factory.bin
           fail_on_unmatched_files: true

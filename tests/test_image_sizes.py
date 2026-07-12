@@ -8,22 +8,20 @@ from conftest import FW
 APP_SLOT = 0x330000   # ota_0 / ota_1 size in default_8MB.csv
 FS_SLOT = 0x180000    # spiffs size
 
-ENVS = ["blink_red", "blink_green"]
+ENV = "obd1"
 
 
-@pytest.mark.parametrize("env", ENVS)
-def test_app_fits_ota_slot(env):
-    fw = FW / ".pio" / "build" / env / "firmware.bin"
+def test_app_fits_ota_slot():
+    fw = FW / ".pio" / "build" / ENV / "firmware.bin"
     if not fw.exists():
-        pytest.skip(f"{env} not built — run ./build_firmwares.sh")
+        pytest.skip(f"{ENV} not built — run ./build_release.sh")
     size = fw.stat().st_size
-    assert size < APP_SLOT, f"{env} app {size} >= slot {APP_SLOT}"
+    assert size < APP_SLOT, f"{ENV} app {size} >= slot {APP_SLOT}"
 
 
-@pytest.mark.parametrize("env", ENVS)
-def test_fs_fits_spiffs(env):
-    fs = FW / ".pio" / "build" / env / "littlefs.bin"
+def test_fs_fits_spiffs():
+    fs = FW / ".pio" / "build" / ENV / "littlefs.bin"
     if not fs.exists():
-        pytest.skip(f"{env} filesystem not built — run ./build_firmwares.sh")
+        pytest.skip(f"{ENV} filesystem not built — run ./build_release.sh")
     size = fs.stat().st_size
-    assert size <= FS_SLOT, f"{env} fs {size} > spiffs {FS_SLOT}"
+    assert size <= FS_SLOT, f"{ENV} fs {size} > spiffs {FS_SLOT}"

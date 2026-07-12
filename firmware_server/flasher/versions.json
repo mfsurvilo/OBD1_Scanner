@@ -1,0 +1,8 @@
+{
+  "_comment": "Available firmware versions for the USB recovery flasher. To publish a new version: cut the release (git tag vX.Y && git push origin vX.Y), then add an entry here (newest first) and set latest:true on it. Each version's factory.bin is pulled from its GitHub Release.",
+  "repo": "mfsurvilo/OBD1_Scanner",
+  "versions": [
+    { "version": "0.4", "tag": "v0.4", "latest": true },
+    { "version": "0.3", "tag": "v0.3" }
+  ]
+}

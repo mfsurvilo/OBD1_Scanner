@@ -47,9 +47,6 @@ void WebServerClass::begin() {
   _http.on("/update/filesystem", HTTP_POST,
            [this]() { finishUpdate(); },
            [this]() { handleUpload(U_SPIFFS); });
-  _http.on("/update/combined", HTTP_POST,
-           [this]() { finishCombined(); },
-           [this]() { handleCombinedUpload(); });
 
   // Internet (STA) features: Wi-Fi provisioning + pull-OTA from GitHub releases.
   _http.on("/wifi", HTTP_POST, [this]() { handleWifiPost(); });
@@ -111,7 +108,6 @@ int WebServerClass::clientCount() {
 String WebServerClass::statusJson() {
   JsonDocument doc;
   doc["name"]      = FW_NAME;
-  doc["variant"]   = FW_VARIANT;
   doc["version"]   = FW_VERSION;
   doc["commit"]    = FW_GIT_COMMIT;
   doc["build"]     = FW_BUILD_DATE;
@@ -229,99 +225,6 @@ void WebServerClass::finishUpdate() {
 }
 
 //=============================================================================
-// Combined OTA — one .ota file carrying firmware + filesystem
-//
-// HTTP uploads arrive in arbitrary-sized chunks. All byte-accounting lives in
-// the pure ota::Parser (include/ota_container.h, unit-tested natively); here we
-// just drive the real Update library off the steps it emits.
-//=============================================================================
-void WebServerClass::handleCombinedUpload() {
-  HTTPUpload& up = _http.upload();
-
-  if (up.status == UPLOAD_FILE_START) {
-    Serial.printf("[ota] combined start: %s\n", up.filename.c_str());
-    _ota = ota::Parser{};       // reset the streaming parser
-    _otaIoError = false;
-    _otaFwCommitted = false;
-    return;
-  }
-  if (up.status == UPLOAD_FILE_ABORTED) {
-    Update.abort();
-    _ota.phase = ota::P_ERROR;
-    return;
-  }
-  if (up.status != UPLOAD_FILE_WRITE && up.status != UPLOAD_FILE_END) return;
-
-  const uint8_t* data = up.buf;
-  uint32_t len = up.currentSize;
-  ota::Step step;
-  while (!_otaIoError && ota::next(_ota, &data, &len, &step)) applyOtaStep(step);
-
-  if (up.status == UPLOAD_FILE_END && !_otaIoError && !ota::is_done(_ota)) {
-    Serial.printf("[ota] combined image %s\n",
-                  ota::is_error(_ota) ? "rejected (bad header)" : "truncated");
-    Update.abort();
-    _otaIoError = true;
-  }
-}
-
-void WebServerClass::finishCombined() {
-  bool ok = ota::is_done(_ota) && !_otaIoError && !Update.hasError();
-  _http.sendHeader("Connection", "close");
-  _http.send(ok ? 200 : 500, "application/json",
-             ok ? "{\"ok\":true,\"msg\":\"firmware + app updated, rebooting\"}"
-                : "{\"ok\":false,\"msg\":\"combined update failed\"}");
-  if (ok) {
-    _rebootPending = true;
-    _rebootAt = millis() + 500;
-  } else {
-    // The app slot was already committed (boot switched) but the FS half
-    // failed — revert the boot partition so we don't come up half-updated.
-    if (_otaFwCommitted) {
-      const esp_partition_t* run = esp_ota_get_running_partition();
-      if (run && esp_ota_set_boot_partition(run) == ESP_OK) {
-        Serial.println("[ota] reverted boot partition after partial failure");
-      }
-    }
-    if (!_fsMounted) _fsMounted = LittleFS.begin(true);  // recover the FS
-  }
-  _otaFwCommitted = false;
-  _ota = ota::Parser{};
-}
-
-// Drive the real Update library from one parser step. Shared by the combined
-// upload and the internet pull. Sets _otaIoError on any failure.
-bool WebServerClass::applyOtaStep(const ota::Step& step) {
-  switch (step.action) {
-    case ota::BEGIN_FW:
-      Serial.printf("[ota] fw=%u fs=%u bytes\n", _ota.header.fw_len, _ota.header.fs_len);
-      if (!Update.begin(step.size, U_FLASH)) { Update.printError(Serial); _otaIoError = true; }
-      break;
-    case ota::WRITE_FW:
-    case ota::WRITE_FS:
-      if (Update.write((uint8_t*)step.data, step.len) != step.len) {
-        Update.printError(Serial); _otaIoError = true;
-      }
-      break;
-    case ota::END_FW:
-      if (!Update.end(true)) { Update.printError(Serial); _otaIoError = true; }
-      else { Serial.println("[ota] app slot written"); _otaFwCommitted = true; }
-      break;
-    case ota::BEGIN_FS:
-      if (_fsMounted) { LittleFS.end(); _fsMounted = false; }
-      if (!Update.begin(step.size, U_SPIFFS)) { Update.printError(Serial); _otaIoError = true; }
-      break;
-    case ota::END_FS:
-      if (!Update.end(true)) { Update.printError(Serial); _otaIoError = true; }
-      else Serial.println("[ota] filesystem written");
-      break;
-    case ota::NONE:
-      break;
-  }
-  return !_otaIoError;
-}
-
-//=============================================================================
 // Home-Wi-Fi (STA) provisioning
 //=============================================================================
 void WebServerClass::startSta() {
@@ -408,7 +311,11 @@ void WebServerClass::handleUpdateCheck() {
   _http.send(200, "application/json", out);
 }
 
-bool WebServerClass::pullOta(const String& url, String& err) {
+// Stream one raw image (firmware.bin or filesystem.bin) from a URL straight
+// into the Update library. `command` is U_FLASH (app) or U_SPIFFS (LittleFS).
+// On U_FLASH success the boot partition is switched to the new slot (pending
+// verify); the caller reverts it if a later step fails.
+bool WebServerClass::pullFile(const String& url, int command, String& err) {
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
@@ -419,46 +326,46 @@ bool WebServerClass::pullOta(const String& url, String& err) {
   int code = http.GET();
   if (code != HTTP_CODE_OK) { err = "HTTP " + String(code); http.end(); return false; }
 
-  _ota = ota::Parser{};
-  _otaIoError = false;
-  _otaFwCommitted = false;
+  int total = http.getSize();          // -1 if chunked/unknown
+  // The filesystem partition can't be written while it's mounted.
+  if (command == U_SPIFFS && _fsMounted) { LittleFS.end(); _fsMounted = false; }
+  // U_FLASH: bound by the free (other) app slot. U_SPIFFS: size from the header
+  // if known, else let Update size it from the spiffs partition.
+  size_t maxSize = (command == U_FLASH)
+                     ? ESP.getFreeSketchSpace()
+                     : (total > 0 ? (size_t)total : UPDATE_SIZE_UNKNOWN);
+  if (!Update.begin(maxSize, command)) {
+    Update.printError(Serial); err = "Update.begin failed"; http.end(); return false;
+  }
 
   WiFiClient* stream = http.getStreamPtr();
-  int total = http.getSize();          // -1 if chunked/unknown
   int received = 0;
   unsigned long lastData = millis();
   uint8_t buf[1024];
-  ota::Step step;
 
   while ((http.connected() || stream->available() > 0) &&
-         !_otaIoError && !ota::is_done(_ota) && !ota::is_error(_ota)) {
+         (total < 0 || received < total)) {
     size_t avail = stream->available();
     if (avail == 0) {
-      if (millis() - lastData > 15000) break;   // stalled
+      if (millis() - lastData > 15000) { err = "stalled"; break; }
       delay(2);
       continue;
     }
     lastData = millis();
     int n = stream->readBytes(buf, avail > sizeof(buf) ? sizeof(buf) : avail);
+    if (n <= 0) continue;
+    if (Update.write(buf, n) != (size_t)n) {
+      Update.printError(Serial); err = "flash write error"; break;
+    }
     received += n;
-    const uint8_t* p = buf;
-    uint32_t len = (uint32_t)n;
-    while (!_otaIoError && ota::next(_ota, &p, &len, &step)) applyOtaStep(step);
   }
   http.end();
 
-  if (_otaIoError || !ota::is_done(_ota)) {
-    err = _otaIoError ? "flash write error"
-                      : (ota::is_error(_ota) ? "bad image header"
-                                             : "download truncated");
-    if (_otaFwCommitted) {   // revert half-applied boot switch
-      const esp_partition_t* run = esp_ota_get_running_partition();
-      if (run) esp_ota_set_boot_partition(run);
-    }
-    if (!_fsMounted) _fsMounted = LittleFS.begin(true);
-    return false;
-  }
-  Serial.printf("[ota] pulled %d bytes, flashed OK\n", received);
+  if (!err.isEmpty()) { Update.abort(); return false; }
+  if (total > 0 && received != total) { Update.abort(); err = "download truncated"; return false; }
+  if (!Update.end(true)) { Update.printError(Serial); err = "Update.end failed"; return false; }
+  Serial.printf("[ota] pulled %d bytes (%s), flashed OK\n",
+                received, command == U_FLASH ? "fw" : "fs");
   return true;
 }
 
@@ -468,19 +375,37 @@ void WebServerClass::handleUpdatePull() {
                "{\"ok\":false,\"msg\":\"device is not connected to the internet\"}");
     return;
   }
-  // This variant's .ota from the latest release (stable /latest/download URL).
-  String url = String("https://github.com/") + GH_REPO +
-               "/releases/latest/download/" + FW_VARIANT + ".ota";
-  Serial.printf("[ota] pulling %s\n", url.c_str());
+  // Stable /latest/download URLs — the release publishes firmware.bin (app) and
+  // filesystem.bin (LittleFS/PWA) under fixed names, so the tag need not appear.
+  const String base = String("https://github.com/") + GH_REPO +
+                      "/releases/latest/download/";
   String err;
-  bool ok = pullOta(url, err);
-  _http.sendHeader("Connection", "close");
-  if (ok) {
-    _http.send(200, "application/json", "{\"ok\":true,\"msg\":\"updated, rebooting\"}");
-    _rebootPending = true;
-    _rebootAt = millis() + 500;
-  } else {
+
+  Serial.printf("[ota] pulling %sfirmware.bin\n", base.c_str());
+  if (!pullFile(base + "firmware.bin", U_FLASH, err)) {
+    if (!_fsMounted) _fsMounted = LittleFS.begin(true);
+    _http.sendHeader("Connection", "close");
     _http.send(500, "application/json",
-               String("{\"ok\":false,\"msg\":\"") + err + "\"}");
+               String("{\"ok\":false,\"msg\":\"firmware: ") + err + "\"}");
+    return;
   }
+
+  // App slot written + boot switched. Now the filesystem; if it fails, revert
+  // the boot partition so the device never comes up half-updated.
+  Serial.printf("[ota] pulling %sfilesystem.bin\n", base.c_str());
+  if (!pullFile(base + "filesystem.bin", U_SPIFFS, err)) {
+    const esp_partition_t* run = esp_ota_get_running_partition();
+    if (run && esp_ota_set_boot_partition(run) == ESP_OK)
+      Serial.println("[ota] reverted boot partition after filesystem failure");
+    if (!_fsMounted) _fsMounted = LittleFS.begin(true);
+    _http.sendHeader("Connection", "close");
+    _http.send(500, "application/json",
+               String("{\"ok\":false,\"msg\":\"filesystem: ") + err + "\"}");
+    return;
+  }
+
+  _http.sendHeader("Connection", "close");
+  _http.send(200, "application/json", "{\"ok\":true,\"msg\":\"updated, rebooting\"}");
+  _rebootPending = true;
+  _rebootAt = millis() + 500;
 }

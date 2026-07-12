@@ -4,7 +4,6 @@
 #include <Arduino.h>
 #include <WebServer.h>
 #include <WebSocketsServer.h>
-#include "ota_container.h"
 
 //=============================================================================
 // WebServerApp — barebones AP + HTTP/WebSocket server for the framework.
@@ -15,17 +14,12 @@
 //  - GET  /status              -> JSON device status (version, uptime, heap...).
 //  - POST /update/firmware     -> OTA the app image      (Update U_FLASH).
 //  - POST /update/filesystem   -> OTA the PWA / LittleFS  (Update U_SPIFFS).
-//  - POST /update/combined     -> OTA both from one .ota container (below).
-//    All reboot on success. Field name for the uploaded file: "file".
+//    Both reboot on success. Field name for the uploaded file: "file".
 //  - POST /wifi                 -> save home-Wi-Fi creds (STA) to NVS + connect.
 //  - GET  /update/check         -> compare running version vs latest release.
-//  - POST /update/pull          -> download this variant's .ota from the latest
-//    GitHub release over the internet (STA) and flash it (reuses ota::Parser).
-//
-// .ota container (little-endian, streamable): 16-byte header
-//     magic[4]="OB1U", u8 version, u8 flags, u16 reserved,
-//     u32 fw_len, u32 fs_len
-// followed by fw_len bytes (app image) then fs_len bytes (LittleFS image).
+//  - POST /update/pull          -> over the internet (STA), download firmware.bin
+//    and filesystem.bin from the latest GitHub release and flash both, then
+//    reboot. This is the one-button consumer update path.
 //  - WebSocket on :81 broadcasts the status JSON ~1 Hz as a heartbeat.
 //
 // OTA is intentionally unauthenticated for now (AP is WPA2-protected). Add a
@@ -54,15 +48,12 @@ private:
   void   streamOr404();                 // serve a LittleFS file (SPA fallback)
   void   handleUpload(int command);     // U_FLASH or U_SPIFFS chunk pump
   void   finishUpdate();                // reply + schedule reboot
-  void   handleCombinedUpload();        // .ota container: fw + fs in one file
-  void   finishCombined();              // reply + schedule reboot
-  bool   applyOtaStep(const ota::Step& step);  // drive Update from a parser step
   void   handleWifiPost();              // save STA creds -> NVS, connect
   void   handleUpdateCheck();           // latest release vs running version
-  void   handleUpdatePull();            // download+flash .ota from the internet
+  void   handleUpdatePull();            // download+flash fw + fs from the internet
   void   startSta();                    // begin STA with saved creds (non-block)
   bool   fetchLatestTag(String& tag);   // GitHub API: latest release tag_name
-  bool   pullOta(const String& url, String& err);  // stream https .ota -> flash
+  bool   pullFile(const String& url, int command, String& err);  // https .bin -> flash
   String statusJson();
   static const char* contentType(const String& path);
 
@@ -76,10 +67,6 @@ private:
   unsigned long    _lastBroadcast = 0;
 
   String           _staSsid;         // saved home-Wi-Fi SSID ("" = not set)
-
-  ota::Parser _ota;                  // .ota streaming parser (pure state machine)
-  bool     _otaIoError = false;      // an Update begin/write/end call failed
-  bool     _otaFwCommitted = false;  // combined: app slot boot already switched
 };
 
 extern WebServerClass WebServerApp;

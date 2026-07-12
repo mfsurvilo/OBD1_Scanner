@@ -18,13 +18,6 @@
 #define FW_GIT_COMMIT "unknown"
 #endif
 
-// Which sample firmware this build is. Set per-env in platformio.ini
-// (e.g. "blink-red" / "blink-green"); reported over /status so the PWA can
-// show which image is currently running.
-#ifndef FW_VARIANT
-#define FW_VARIANT "dev"
-#endif
-
 #define FW_NAME       "OBD1_Scanner"
 #define FW_BUILD_DATE (__DATE__ " " __TIME__)
 

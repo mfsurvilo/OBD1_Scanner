@@ -37,23 +37,8 @@ function setLink(online) {
   $('s-link').textContent = online ? 'connected' : 'offline';
 }
 
-// Background reflects the running firmware variant — visual proof of which
-// image is flashed (dark red for blink-red, dark green for blink-green).
-const VARIANT_BG = {
-  'blink-red':   '#2a0d0d',
-  'blink-green': '#0d2413',
-};
-function applyVariantTheme(variant) {
-  const bg = VARIANT_BG[variant] || '#0d1117';
-  document.documentElement.style.setProperty('--bg', bg);
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', bg);
-}
-
 function render(d) {
   setLink(true);
-  applyVariantTheme(d.variant);
-  $('s-variant').textContent = d.variant || '—';
   $('s-version').textContent = d.version || '—';
   $('s-build').textContent   = d.build || '—';
   $('s-commit').textContent  = d.commit || '—';
@@ -63,7 +48,7 @@ function render(d) {
   $('s-sta').textContent     = d.sta_connected
     ? `${d.sta_ssid || 'connected'} (${d.sta_ip || ''})`
     : (d.sta_ssid ? `connecting to ${d.sta_ssid}…` : 'not set up');
-  $('foot').textContent      = `${d.name || 'OBD1 Scanner'} · ${d.variant || ''} ${d.version || ''}`.trim();
+  $('foot').textContent      = `${d.name || 'OBD1 Scanner'} · ${d.version || ''}`.trim();
 }
 
 // --- Live link: WebSocket heartbeat + HTTP poll fallback --------------------
@@ -130,8 +115,6 @@ function setMsg(el, text, cls) {
   el.className = `msg ${cls}`;
 }
 
-$('ota-btn').addEventListener('click', () =>
-  upload('/update/combined', $('ota-file'), $('ota-btn'), $('ota-bar'), $('ota-msg')));
 $('fw-btn').addEventListener('click', () =>
   upload('/update/firmware', $('fw-file'), $('fw-btn'), $('fw-bar'), $('fw-msg')));
 $('fs-btn').addEventListener('click', () =>
