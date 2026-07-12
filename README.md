@@ -98,11 +98,13 @@ in **[`firmware_server/README.md`](firmware_server/README.md)**.
 
 | Layer | What | Runs in CI? |
 |---|---|---|
-| 0 — host contract (`pytest`) | partition layout, `/status` + `/update/*` surface, image sizes | ✅ `ci.yml` |
+| 0 — host contract (`pytest`) | partition layout, `/status` + `/update/*` surface, image sizes, release-asset & `versions.json` contracts | ✅ |
+| 1 — native unit (`pio test -e native`) | pure firmware logic — semver version ordering | ✅ |
 | 4–5 — hardware (`hil_roundtrip.py`) | OTA app+fs round-trip, rollback, downgrade matrix | ❌ manual/local |
 
 ```bash
 python -m pytest tests/ -q          # Layer 0, no hardware (what CI runs)
+cd firmware && pio test -e native   # Layer 1, native Unity tests
 ```
 
 Hardware tests need a real board on the `OBD1_Scanner` AP with USB attached.

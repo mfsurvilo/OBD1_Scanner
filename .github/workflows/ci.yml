@@ -1,7 +1,7 @@
-name: ci
+name: Regression Tests
 
-# Host contract tests (partition layout, HTTP/API surface, image sizes). Fast,
-# no hardware, runs on every push.
+# Layer 0 (host contract tests) + Layer 1 (native Unity unit tests). Fast, no
+# hardware, runs on every push.
 on:
   push:
     branches: [main, master]
@@ -18,3 +18,16 @@ jobs:
       - run: pip install pytest
       - name: Host regression tests
         run: python -m pytest tests/ -q
+
+  native-tests:
+    # Layer 1: pure firmware logic (version_compare.h) unit-tested natively.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install platformio
+      - name: Native unit tests
+        run: pio test -e native
+        working-directory: firmware

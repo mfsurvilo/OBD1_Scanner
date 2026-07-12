@@ -68,3 +68,23 @@ def test_flasher_and_pages_agree_on_factory_path():
         "index.html doesn't fetch fw/<tag>-factory.bin"
     assert "site/fw/${tag}-factory.bin" in PAGES_YML.read_text(), \
         "pages.yml doesn't mirror to fw/<tag>-factory.bin"
+
+
+# --- CHANGELOG must document every published version -------------------------
+def test_changelog_covers_every_version():
+    changelog = (ROOT / "CHANGELOG.md").read_text()
+    for v in json.loads(VERSIONS.read_text())["versions"]:
+        assert f"## {v['tag']}" in changelog, \
+            f"CHANGELOG.md is missing a '## {v['tag']}' section"
+
+
+# --- the retired .ota combined format must not creep back in -----------------
+def test_ota_combined_format_stays_retired():
+    # Docs/CHANGELOG may mention .ota historically; the firmware and PWA must not.
+    banned = ["update/combined", "handleCombinedUpload", "ota_container", "OB1U"]
+    for base in (FW / "src", FW / "include", ROOT / "pwa_app"):
+        for path in base.rglob("*"):
+            if path.is_file() and path.suffix in (".cpp", ".h", ".js", ".html"):
+                text = path.read_text()
+                for token in banned:
+                    assert token not in text, f"{token!r} reappeared in {path}"

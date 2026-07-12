@@ -1,5 +1,6 @@
 #include "web_server.h"
 #include "version.h"
+#include "version_compare.h"
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -271,15 +272,6 @@ void WebServerClass::handleWifiPost() {
 // hardened build, pin GitHub's CA instead.
 //=============================================================================
 
-// Pack a "vMAJOR.MINOR.PATCH" tag into a comparable integer (missing parts = 0).
-static long versionKey(const String& tag) {
-  const char* s = tag.c_str();
-  if (*s == 'v' || *s == 'V') s++;
-  int maj = 0, min = 0, pat = 0;
-  sscanf(s, "%d.%d.%d", &maj, &min, &pat);
-  return (long)maj * 1000000L + (long)min * 1000L + pat;
-}
-
 bool WebServerClass::fetchLatestTag(String& tag) {
   if (WiFi.status() != WL_CONNECTED) return false;
   WiFiClientSecure client;
@@ -309,7 +301,7 @@ bool WebServerClass::fetchLatestTag(String& tag) {
     if ((r["draft"] | false) || (r["prerelease"] | false)) continue;
     String t = r["tag_name"].as<String>();
     if (t.isEmpty()) continue;
-    long k = versionKey(t);
+    long k = version_key(t.c_str());
     if (k > best) { best = k; tag = t; }
   }
   return best >= 0;

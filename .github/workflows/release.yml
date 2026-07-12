@@ -1,4 +1,4 @@
-name: release
+name: GitHub Release
 
 # On a version tag: build the firmware, package the images, and publish them to
 # a GitHub Release. Assets have stable names (the tag carries the version):

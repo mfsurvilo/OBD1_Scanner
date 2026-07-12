@@ -22,6 +22,18 @@ cd <repo root>
 CI-friendly — no board required. `test_image_sizes.py` needs
 `firmware/build_release.sh` to have run.
 
+## Layer 1 — native unit tests (no hardware) — `pio test`
+
+Pure firmware logic compiled + unit-tested natively with Unity (no board, no
+toolchain download):
+
+- `test_version_compare` — `include/version_compare.h`, the semver ordering that
+  picks the highest release version (the logic behind the OTA update check).
+
+```bash
+cd firmware && pio test -e native
+```
+
 ## Layers 4–5 — hardware round-trip — `hil_roundtrip.py`
 
 Needs a real device on the **OBD1_Scanner** AP with USB plugged in (Wi-Fi + USB
@@ -44,5 +56,5 @@ Needs `requests` + `esptool` + `platformio` on PATH.
 
 ## CI
 
-`.github/workflows/ci.yml` runs Layer 0 (pytest) on every push/PR. Hardware
-layers (4–5) are manual/local.
+CI runs Layer 0 (pytest) and Layer 1 (`pio test -e native`) on every push/PR.
+Hardware layers (4–5) are manual/local.
