@@ -1,0 +1,56 @@
+name: pages
+
+# Deploy the ESP Web Tools flasher + OTA download page to GitHub Pages.
+# Triggered on pushes to master (the github-pages environment allows the default
+# branch, unlike tags), so no environment protection changes are needed.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio esptool
+      - name: Build + package (produces flasher factory bins + manifests)
+        run: bash firmware/build_firmwares.sh
+      - name: Stage Pages site
+        run: |
+          mkdir -p site
+          cp -r firmware_server/flasher/* site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

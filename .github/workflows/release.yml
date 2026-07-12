@@ -1,21 +1,17 @@
 name: release
 
-# On a version tag: build both firmwares, package every image, publish the
-# binaries to a GitHub Release, and deploy the ESP Web Tools flasher to Pages.
-#
-# One-time repo setup:
-#   Settings > Pages > Source = "GitHub Actions"
+# On a version tag: build both firmwares, package every image, and publish the
+# binaries (.bin/.ota) to a GitHub Release. (Pages is deployed separately by
+# pages.yml on master pushes, which the github-pages environment allows.)
 #
 # Cut a release with:
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag v0.2.0 && git push origin v0.2.0
 on:
   push:
     tags: ["v*"]
 
 permissions:
   contents: write     # create the Release
-  pages: write        # deploy Pages
-  id-token: write     # Pages OIDC
 
 jobs:
   build:
@@ -42,16 +38,6 @@ jobs:
       - name: Build + package all images
         run: bash firmware/build_firmwares.sh
 
-      - name: Stage Pages site (flasher + factory bins)
-        run: |
-          mkdir -p site
-          cp -r firmware_server/flasher/* site/
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
       - name: Publish Release binaries
         uses: softprops/action-gh-release@v2
         with:
@@ -59,13 +45,3 @@ jobs:
             firmware_server/firmware/*.bin
             firmware_server/firmware/*.ota
           fail_on_unmatched_files: true
-
-  deploy-pages:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - id: deploy
-        uses: actions/deploy-pages@v4
