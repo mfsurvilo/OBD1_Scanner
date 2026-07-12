@@ -60,6 +60,9 @@ function render(d) {
   $('s-uptime').textContent  = d.uptime_ms != null ? fmtUptime(d.uptime_ms) : '—';
   $('s-heap').textContent    = d.free_heap != null ? `${(d.free_heap / 1024).toFixed(1)} KB` : '—';
   $('s-clients').textContent = d.clients != null ? d.clients : '—';
+  $('s-sta').textContent     = d.sta_connected
+    ? `${d.sta_ssid || 'connected'} (${d.sta_ip || ''})`
+    : (d.sta_ssid ? `connecting to ${d.sta_ssid}…` : 'not set up');
   $('foot').textContent      = `${d.name || 'OBD1 Scanner'} · ${d.variant || ''} ${d.version || ''}`.trim();
 }
 
@@ -133,3 +136,57 @@ $('fw-btn').addEventListener('click', () =>
   upload('/update/firmware', $('fw-file'), $('fw-btn'), $('fw-bar'), $('fw-msg')));
 $('fs-btn').addEventListener('click', () =>
   upload('/update/filesystem', $('fs-file'), $('fs-btn'), $('fs-bar'), $('fs-msg')));
+
+// --- Wi-Fi provisioning + internet pull-OTA ---------------------------------
+$('wifi-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ssid = $('wifi-ssid').value.trim();
+  if (!ssid) { setMsg($('wifi-msg'), 'Enter a Wi-Fi network name.', 'bad'); return; }
+  $('wifi-btn').disabled = true;
+  setMsg($('wifi-msg'), 'Saving…', '');
+  try {
+    const body = new URLSearchParams({ ssid, pass: $('wifi-pass').value });
+    const r = await fetch(`${API}/wifi`, { method: 'POST', body });
+    const j = await r.json();
+    setMsg($('wifi-msg'), r.ok ? 'Saved — connecting. Watch “Internet” above.' : (j.msg || 'Failed'),
+           r.ok ? 'ok' : 'bad');
+  } catch {
+    setMsg($('wifi-msg'), 'Could not reach the scanner.', 'bad');
+  }
+  $('wifi-btn').disabled = false;
+});
+
+$('chk-btn').addEventListener('click', async () => {
+  $('chk-btn').disabled = true;
+  $('pull-btn').style.display = 'none';
+  setMsg($('chk-msg'), 'Checking…', '');
+  try {
+    const j = await (await fetch(`${API}/update/check`, { cache: 'no-store' })).json();
+    if (!j.ok) {
+      setMsg($('chk-msg'), j.msg || 'Check failed.', 'bad');
+    } else if (j.update_available) {
+      setMsg($('chk-msg'), `Update available: ${j.current} → ${j.latest}`, 'ok');
+      $('pull-btn').style.display = '';
+    } else {
+      setMsg($('chk-msg'), `Up to date (${j.current}).`, 'ok');
+    }
+  } catch {
+    setMsg($('chk-msg'), 'Could not reach the scanner.', 'bad');
+  }
+  $('chk-btn').disabled = false;
+});
+
+$('pull-btn').addEventListener('click', async () => {
+  $('pull-btn').disabled = true;
+  setMsg($('pull-msg'), 'Downloading + flashing on the device… (~30 s, do not power off)', '');
+  try {
+    const r = await fetch(`${API}/update/pull`, { method: 'POST' });
+    const j = await r.json();
+    setMsg($('pull-msg'), r.ok ? 'Updated — device rebooting. Reconnect shortly.' : (j.msg || 'Failed'),
+           r.ok ? 'ok' : 'bad');
+  } catch {
+    // The socket drops as the device reboots on success.
+    setMsg($('pull-msg'), 'Connection closed — device is likely rebooting after update.', 'ok');
+  }
+  $('pull-btn').disabled = false;
+});

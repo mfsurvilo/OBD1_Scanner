@@ -30,7 +30,29 @@
         <dt>Uptime</dt>     <dd id="s-uptime">—</dd>
         <dt>Free heap</dt>  <dd id="s-heap">—</dd>
         <dt>Clients</dt>    <dd id="s-clients">—</dd>
+        <dt>Internet</dt>   <dd id="s-sta">—</dd>
       </dl>
+    </section>
+
+    <!-- Update over the internet (device pulls from GitHub via home Wi-Fi) -->
+    <section class="card">
+      <h2>Internet update</h2>
+      <p class="hint">Connect the scanner to your home Wi-Fi so it can pull
+        updates from the internet itself — no file downloads needed.</p>
+
+      <form id="wifi-form" autocomplete="off">
+        <input type="text" id="wifi-ssid" placeholder="Wi-Fi network (SSID)">
+        <input type="password" id="wifi-pass" placeholder="Wi-Fi password">
+        <button type="submit" id="wifi-btn" class="btn btn-alt">Save &amp; Connect</button>
+      </form>
+      <p id="wifi-msg" class="msg"></p>
+
+      <div id="upd-block" style="margin-top:14px">
+        <button id="chk-btn" class="btn">Check for updates</button>
+        <p id="chk-msg" class="msg"></p>
+        <button id="pull-btn" class="btn" style="display:none">Update now</button>
+        <p id="pull-msg" class="msg"></p>
+      </div>
     </section>
 
     <!-- OTA: one .ota file flashes firmware + app together -->

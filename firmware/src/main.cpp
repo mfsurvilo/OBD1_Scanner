@@ -99,7 +99,9 @@ void setup() {
                 FW_NAME, FW_VERSION, FW_VARIANT, FW_GIT_COMMIT, FW_BUILD_DATE);
 
   xTaskCreatePinnedToCore(blinkTask, "blink", 2048, nullptr, 1, nullptr, 1);
-  xTaskCreatePinnedToCore(netTask,   "net",   8192, nullptr, 1, nullptr, 0);
+  // 16 KB stack: the internet pull-OTA does a TLS handshake (mbedTLS) which
+  // needs more headroom than the default 8 KB.
+  xTaskCreatePinnedToCore(netTask,   "net",  16384, nullptr, 1, nullptr, 0);
 }
 
 void loop() {

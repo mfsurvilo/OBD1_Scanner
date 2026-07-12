@@ -17,6 +17,10 @@
 //  - POST /update/filesystem   -> OTA the PWA / LittleFS  (Update U_SPIFFS).
 //  - POST /update/combined     -> OTA both from one .ota container (below).
 //    All reboot on success. Field name for the uploaded file: "file".
+//  - POST /wifi                 -> save home-Wi-Fi creds (STA) to NVS + connect.
+//  - GET  /update/check         -> compare running version vs latest release.
+//  - POST /update/pull          -> download this variant's .ota from the latest
+//    GitHub release over the internet (STA) and flash it (reuses ota::Parser).
 //
 // .ota container (little-endian, streamable): 16-byte header
 //     magic[4]="OB1U", u8 version, u8 flags, u16 reserved,
@@ -36,6 +40,7 @@ public:
   static constexpr int  HTTP_PORT      = 80;
   static constexpr int  WS_PORT        = 81;
   static constexpr const char* MDNS_HOST = "obd1";        // http://obd1.local
+  static constexpr const char* GH_REPO = "mfsurvilo/OBD1_Scanner";  // update source
 
   void begin();
   void loop();
@@ -51,6 +56,13 @@ private:
   void   finishUpdate();                // reply + schedule reboot
   void   handleCombinedUpload();        // .ota container: fw + fs in one file
   void   finishCombined();              // reply + schedule reboot
+  bool   applyOtaStep(const ota::Step& step);  // drive Update from a parser step
+  void   handleWifiPost();              // save STA creds -> NVS, connect
+  void   handleUpdateCheck();           // latest release vs running version
+  void   handleUpdatePull();            // download+flash .ota from the internet
+  void   startSta();                    // begin STA with saved creds (non-block)
+  bool   fetchLatestTag(String& tag);   // GitHub API: latest release tag_name
+  bool   pullOta(const String& url, String& err);  // stream https .ota -> flash
   String statusJson();
   static const char* contentType(const String& path);
 
@@ -62,6 +74,8 @@ private:
   bool             _rebootPending = false;
   unsigned long    _rebootAt      = 0;
   unsigned long    _lastBroadcast = 0;
+
+  String           _staSsid;         // saved home-Wi-Fi SSID ("" = not set)
 
   ota::Parser _ota;                  // .ota streaming parser (pure state machine)
   bool     _otaIoError = false;      // an Update begin/write/end call failed

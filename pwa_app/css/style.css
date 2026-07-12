@@ -72,6 +72,19 @@ input[type="file"] {
   margin-bottom: 12px;
 }
 
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 15px;
+  color: var(--text);
+  background: #0d1117;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+input::placeholder { color: var(--muted); }
+
 .btn {
   width: 100%;
   padding: 12px;
