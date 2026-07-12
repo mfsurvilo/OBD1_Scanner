@@ -15,10 +15,12 @@ firmware/           generated release images (git-ignored, staged for Releases)
   factory.bin         full flash     (USB recovery)
 ```
 
-`index.html` reads `versions.json` and, for the selected version, pulls that
-version's `factory.bin` straight from its GitHub Release (ESP Web Tools). The
-`firmware/` images are **generated** by `../firmware/build_release.sh` and
-published to the Release by CI — never committed.
+`index.html` reads `versions.json` and, for the selected version, flashes that
+version's `factory.bin` (ESP Web Tools). GitHub release assets aren't served
+with CORS headers, so `pages.yml` mirrors each listed version's `factory.bin`
+onto the Pages origin (`fw/<tag>-factory.bin`) at deploy time. The `firmware/`
+images are **generated** by `../firmware/build_release.sh` and published to the
+Release by CI — never committed.
 
 ## Publishing a new version
 

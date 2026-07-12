@@ -1,10 +1,12 @@
 name: pages
 
 # Deploy the USB recovery flasher (firmware_server/flasher/) to GitHub Pages.
-# The flasher is fully static: index.html reads versions.json and pulls each
-# version's factory.bin straight from its GitHub Release, so no firmware build
-# is needed here. Triggered on pushes to master (the github-pages environment
-# allows the default branch).
+# index.html reads versions.json and flashes each version's factory.bin. GitHub
+# release assets aren't served with CORS headers (so ESP Web Tools can't fetch
+# them cross-origin), so this workflow mirrors each listed version's factory.bin
+# onto the Pages origin under fw/<tag>-factory.bin. No firmware build needed.
+# Triggered on pushes to master (the github-pages environment allows the default
+# branch).
 on:
   push:
     branches: [master]
@@ -26,8 +28,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Stage Pages site
         run: |
-          mkdir -p site
+          mkdir -p site/fw
           cp -r firmware_server/flasher/* site/
+          # Mirror each listed version's factory.bin onto this origin so ESP Web
+          # Tools can fetch it (GitHub release assets lack CORS headers).
+          for tag in $(jq -r '.versions[].tag' firmware_server/flasher/versions.json); do
+            echo "==> mirroring $tag/factory.bin"
+            curl -fSL -o "site/fw/${tag}-factory.bin" \
+              "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/factory.bin"
+          done
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

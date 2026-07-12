@@ -74,18 +74,21 @@
     const installer = document.getElementById('installer');
     const errEl = document.getElementById('err');
 
-    function factoryUrl(repo, tag) {
-      return `https://github.com/${repo}/releases/download/${tag}/factory.bin`;
+    function factoryUrl(tag) {
+      // Same-origin copy staged by pages.yml. GitHub release assets are NOT
+      // served with CORS headers, so ESP Web Tools can't fetch them from this
+      // origin directly — we mirror each version's factory.bin onto Pages.
+      return new URL(`fw/${tag}-factory.bin`, document.baseURI).href;
     }
 
-    function setManifest(repo, v) {
+    function setManifest(v) {
       const manifest = {
         name: 'OBD1 Scanner',
         version: v.version,
         new_install_prompt_erase: true,
         builds: [{
           chipFamily: 'ESP32-S3',
-          parts: [{ path: factoryUrl(repo, v.tag), offset: 0 }],
+          parts: [{ path: factoryUrl(v.tag), offset: 0 }],
         }],
       };
       const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
@@ -95,7 +98,6 @@
     (async () => {
       try {
         const data = await (await fetch('versions.json', { cache: 'no-store' })).json();
-        const repo = data.repo;
         const versions = data.versions || [];
         if (!versions.length) throw new Error('no versions listed');
 
@@ -107,8 +109,8 @@
         });
         const defaultIdx = Math.max(0, versions.findIndex(v => v.latest));
         sel.value = defaultIdx;
-        setManifest(repo, versions[defaultIdx]);
-        sel.addEventListener('change', () => setManifest(repo, versions[sel.value]));
+        setManifest(versions[defaultIdx]);
+        sel.addEventListener('change', () => setManifest(versions[sel.value]));
       } catch (e) {
         errEl.textContent = `Could not load firmware list: ${e.message}`;
         sel.disabled = true;
