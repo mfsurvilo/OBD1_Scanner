@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "obd1-protocol/schema.json",
+  "title": "OBD1 Scanner FW <-> Front-End messages",
+  "description": "Canonical shapes for PROTOCOL.md. Consumed at runtime by protocol/validate.js. Additive (new optional) fields are allowed everywhere on purpose - see the versioning rule in PROTOCOL.md.",
+
+  "$defs": {
+    "Snapshot": {
+      "type": "object",
+      "description": "Downstream FW -> UI live snapshot (WebSocket broadcast and GET /data).",
+      "required": ["connected", "timestamp", "params"],
+      "properties": {
+        "connected": { "type": "boolean" },
+        "timestamp": { "type": "integer", "minimum": 0 },
+        "baseHz":    { "type": "number", "minimum": 0 },
+        "params":    { "type": "array", "items": { "$ref": "#/$defs/ParamSample" } },
+        "dtc":       { "type": "array", "items": { "$ref": "#/$defs/Dtc" } },
+        "status":    { "type": "string" }
+      }
+    },
+
+    "ParamSample": {
+      "type": "object",
+      "description": "One param in a snapshot. 'raw' is pre-scaling; the UI computes value = raw*scale + offset.",
+      "required": ["name", "raw"],
+      "properties": {
+        "name": { "type": "string" },
+        "raw":  { "type": "number" },
+        "unit": { "type": "string" },
+        "time": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "Dtc": {
+      "type": "object",
+      "required": ["type", "code"],
+      "properties": {
+        "type": { "type": "string", "enum": ["active", "stored"] },
+        "code": { "type": "string" },
+        "desc": { "type": "string" }
+      }
+    },
+
+    "ParamsResponse": {
+      "type": "object",
+      "description": "GET /params - catalog + calibration for the active ECU.",
+      "required": ["ecu", "params"],
+      "properties": {
+        "ecu":         { "type": "string" },
+        "name":        { "type": "string" },
+        "readsPerSec": { "type": "number", "minimum": 0 },
+        "params":      { "type": "array", "items": { "$ref": "#/$defs/ParamDescriptor" } }
+      }
+    },
+
+    "ParamDescriptor": {
+      "type": "object",
+      "description": "Persisted per-param record (FW flash). scale/offset/defaultFactor editable via the calibration page.",
+      "required": ["name", "addr"],
+      "properties": {
+        "name":          { "type": "string" },
+        "addr":          { "type": "string" },
+        "unit":          { "type": "string" },
+        "scale":         { "type": "number" },
+        "offset":        { "type": "number" },
+        "defaultFactor": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "SubscribeCommand": {
+      "type": "object",
+      "description": "UI -> FW. A subscribe is the COMPLETE active set; names absent are treated as factor 0.",
+      "required": ["cmd", "factors"],
+      "properties": {
+        "cmd":     { "type": "string", "enum": ["subscribe"] },
+        "factors": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+      }
+    },
+
+    "SubscribeAck": {
+      "type": "object",
+      "description": "FW -> UI confirmation of a subscribe.",
+      "required": ["ack", "active"],
+      "properties": {
+        "ack":      { "type": "string", "enum": ["subscribe"] },
+        "active":   { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "baseHz":   { "type": "number", "minimum": 0 },
+        "rejected": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

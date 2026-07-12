@@ -1,0 +1,19 @@
+{
+    "name": "BT Diagnostic Tool",
+    "short_name": "BT Diagnostic",
+    "description": "Bluetooth vehicle diagnostics tool",
+    "start_url": "/",
+    "display": "fullscreen",
+    "background_color": "#0d0d1a",
+    "theme_color": "#0d0d1a",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "icons/dashboard.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["utilities", "automotive"]
+}

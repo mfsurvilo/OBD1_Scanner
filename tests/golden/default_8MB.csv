@@ -1,0 +1,11 @@
+# Golden copy of the OTA partition layout the firmware is released against.
+# Frozen on purpose: changing these offsets/sizes breaks OTA and up/down-grade
+# between releases. test_partition_layout.py compares the live framework copy
+# against this. If the framework ever changes it, that test fails on purpose.
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x330000,
+app1,     app,  ota_1,   0x340000,0x330000,
+spiffs,   data, spiffs,  0x670000,0x180000,
+coredump, data, coredump,0x7F0000,0x10000,

@@ -1,0 +1,6 @@
+# Generated build artifacts (produced by firmware/build_firmwares.sh, and by
+# CI for Releases/Pages). Keep them out of git history — they're big and rebuilt.
+firmware/
+flasher/*-factory.bin
+flasher/manifest-*.json
+__pycache__/

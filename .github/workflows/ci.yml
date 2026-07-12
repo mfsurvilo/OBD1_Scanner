@@ -1,0 +1,33 @@
+name: ci
+
+# Layer 0 of the test pyramid: host contract tests (partition layout, .ota
+# format, HTTP/API surface, image sizes). Fast, no hardware, runs on every push.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      - name: Host regression tests
+        run: python -m pytest tests/ -q
+
+  native-tests:
+    # Layer 1: the real C .ota parser compiled + unit-tested natively (Unity).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install platformio
+      - name: Native unit tests
+        run: pio test -e native
+        working-directory: firmware

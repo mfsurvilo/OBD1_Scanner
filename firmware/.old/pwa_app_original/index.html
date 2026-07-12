@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d0d1a">
+    <meta name="description" content="OBD1 Scanner Dashboard PWA">
+    <title>BT Diagnostic Tool</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icons/dashboard.png">
+    <link rel="apple-touch-icon" href="icons/dashboard.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Main Menu Page -->
+        <div class="page active" id="page-home">
+            <header class="home-header">
+                <h1>BT Diagnostic Tool</h1>
+                <div class="status-indicator">
+                    <span class="heartbeat" title="Scanner comms"></span>
+                </div>
+            </header>
+
+            <main class="home-main">
+                <div class="menu-grid">
+                    <button class="menu-card" data-page="vehicle">
+                        <div class="menu-icon"><img src="icons/dashboard.png" alt=""></div>
+                        <div class="menu-label">General Vehicle Data</div>
+                    </button>
+
+                    <button class="menu-card" data-page="diagnostic">
+                        <div class="menu-icon"><img src="icons/diagnostics.png" alt=""></div>
+                        <div class="menu-label">Diagnostic Data</div>
+                    </button>
+
+                    <button class="menu-card" data-page="recorder">
+                        <div class="menu-icon"><img src="icons/circle.png" alt=""></div>
+                        <div class="menu-label">Data Recorder</div>
+                    </button>
+
+                    <button class="menu-card" data-page="custom">
+                        <div class="menu-icon menu-plus">+</div>
+                        <div class="menu-label">Custom View</div>
+                    </button>
+
+                    <button class="menu-card" data-page="settings">
+                        <div class="menu-icon"><img src="icons/settings.png" alt=""></div>
+                        <div class="menu-label">Settings</div>
+                    </button>
+                </div>
+            </main>
+
+            <footer>
+                <p>BT Diagnostic Tool v2.0</p>
+            </footer>
+        </div>
+
+        <!-- General Vehicle Data Page -->
+        <div class="page" id="page-vehicle">
+            <header class="page-header">
+                <button class="back-btn" data-page="home">←</button>
+                <h1>General Vehicle Data</h1>
+                <span class="heartbeat" title="Scanner comms"></span>
+            </header>
+
+            <main class="data-main">
+                <div class="view-toggle">
+                    <button class="toggle-btn active" data-view="gauges">Gauges</button>
+                    <button class="toggle-btn" data-view="plots">Plots</button>
+                </div>
+
+                <section class="gauges-view active">
+                    <div class="gauges-grid">
+                        <div class="gauge-card">
+                            <div class="gauge-label">RPM</div>
+                            <div class="gauge-value" id="v-rpm">0</div>
+                            <div class="gauge-unit">rev/min</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="v-rpm-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Speed</div>
+                            <div class="gauge-value" id="v-speed">0</div>
+                            <div class="gauge-unit">mph</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="v-speed-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Coolant Temp</div>
+                            <div class="gauge-value" id="v-coolant">0</div>
+                            <div class="gauge-unit">°F</div>
+                            <div class="gauge-bar"><div class="gauge-fill temp" id="v-coolant-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Battery</div>
+                            <div class="gauge-value" id="v-battery">0.0</div>
+                            <div class="gauge-unit">volts</div>
+                            <div class="gauge-bar"><div class="gauge-fill battery" id="v-battery-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Intake Air Temp</div>
+                            <div class="gauge-value" id="v-iat">0</div>
+                            <div class="gauge-unit">°F</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="v-iat-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Fuel Level</div>
+                            <div class="gauge-value" id="v-fuel">0</div>
+                            <div class="gauge-unit">%</div>
+                            <div class="gauge-bar"><div class="gauge-fill throttle" id="v-fuel-bar"></div></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="plots-view">
+                    <div class="plot-container">
+                        <div class="plot-card">
+                            <div class="plot-header">RPM</div>
+                            <canvas id="plot-v-rpm"></canvas>
+                        </div>
+                        <div class="plot-card">
+                            <div class="plot-header">Speed</div>
+                            <canvas id="plot-v-speed"></canvas>
+                        </div>
+                        <div class="plot-card">
+                            <div class="plot-header">Coolant Temp</div>
+                            <canvas id="plot-v-coolant"></canvas>
+                        </div>
+                        <div class="plot-card">
+                            <div class="plot-header">Battery</div>
+                            <canvas id="plot-v-battery"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="data-footer" id="footer-vehicle">No parameters selected</div>
+            </main>
+        </div>
+
+        <!-- Diagnostic Data Page -->
+        <div class="page" id="page-diagnostic">
+            <header class="page-header">
+                <button class="back-btn" data-page="home">←</button>
+                <h1>Diagnostic Data</h1>
+                <span class="heartbeat" title="Scanner comms"></span>
+            </header>
+
+            <main class="data-main">
+                <div class="view-toggle">
+                    <button class="toggle-btn active" data-view="gauges">Gauges</button>
+                    <button class="toggle-btn" data-view="plots">Plots</button>
+                </div>
+
+                <section class="gauges-view active">
+                    <div class="gauges-grid">
+                        <div class="gauge-card">
+                            <div class="gauge-label">Throttle Position</div>
+                            <div class="gauge-value" id="d-throttle">0</div>
+                            <div class="gauge-unit">%</div>
+                            <div class="gauge-bar"><div class="gauge-fill throttle" id="d-throttle-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Timing Advance</div>
+                            <div class="gauge-value" id="d-timing">0</div>
+                            <div class="gauge-unit">° BTDC</div>
+                            <div class="gauge-bar"><div class="gauge-fill timing" id="d-timing-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">O2 Sensor</div>
+                            <div class="gauge-value" id="d-o2">0.0</div>
+                            <div class="gauge-unit">volts</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="d-o2-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">MAP</div>
+                            <div class="gauge-value" id="d-map">0</div>
+                            <div class="gauge-unit">kPa</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="d-map-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Fuel Trim</div>
+                            <div class="gauge-value" id="d-fueltrim">0</div>
+                            <div class="gauge-unit">%</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="d-fueltrim-bar"></div></div>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-label">Injector Pulse</div>
+                            <div class="gauge-value" id="d-injector">0.0</div>
+                            <div class="gauge-unit">ms</div>
+                            <div class="gauge-bar"><div class="gauge-fill" id="d-injector-bar"></div></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="plots-view">
+                    <div class="plot-container">
+                        <div class="plot-card">
+                            <div class="plot-header">Throttle Position</div>
+                            <canvas id="plot-d-throttle"></canvas>
+                        </div>
+                        <div class="plot-card">
+                            <div class="plot-header">Timing Advance</div>
+                            <canvas id="plot-d-timing"></canvas>
+                        </div>
+                        <div class="plot-card">
+                            <div class="plot-header">O2 Sensor</div>
+                            <canvas id="plot-d-o2"></canvas>
+                        </div>
+                        <div class="plot-card">
+                            <div class="plot-header">MAP</div>
+                            <canvas id="plot-d-map"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="data-footer" id="footer-diagnostic">No parameters selected</div>
+            </main>
+        </div>
+
+        <!-- Data Recorder Page -->
+        <div class="page" id="page-recorder">
+            <header class="page-header">
+                <button class="back-btn" data-page="home">←</button>
+                <h1>Data Recorder</h1>
+            </header>
+
+            <main class="recorder-main">
+                <div class="recorder-status">
+                    <div class="recorder-indicator" id="recorderIndicator">
+                        <span class="rec-dot"></span>
+                        <span id="recorderState">Stopped</span>
+                    </div>
+                    <div class="recorder-time" id="recorderTime">00:00:00</div>
+                    <div class="recorder-samples" id="recorderSamples">0 samples</div>
+                </div>
+
+                <div class="recorder-controls">
+                    <button class="btn btn-record" id="btnRecord">● Record</button>
+                    <button class="btn btn-secondary" id="btnExport" disabled>
+                        <span class="btn-icon">💾</span> Export CSV
+                    </button>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Parameters to record</h3>
+                    <p class="text-muted" id="recStatus">Loading…</p>
+                    <div class="cal-table-wrap">
+                        <table class="cal-table">
+                            <thead>
+                                <tr><th>Parameter</th><th>Unit</th><th>Sample ×</th></tr>
+                            </thead>
+                            <tbody id="recTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="data-footer" id="footer-recorder">No parameters selected</div>
+            </main>
+        </div>
+
+        <!-- Custom View Page -->
+        <div class="page" id="page-custom">
+            <header class="page-header">
+                <button class="back-btn" data-page="home">←</button>
+                <h1>Custom View</h1>
+                <span class="heartbeat" title="Scanner comms"></span>
+            </header>
+
+            <main class="data-main">
+                <div class="settings-group">
+                    <h3>Select parameters to view</h3>
+                    <p class="text-muted" id="customStatus">Loading…</p>
+                    <div class="cal-table-wrap">
+                        <table class="cal-table">
+                            <thead><tr><th>Show</th><th>Parameter</th><th>Unit</th></tr></thead>
+                            <tbody id="customTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="gauges-grid" id="customGauges"></div>
+                <div class="data-footer" id="footer-custom">No parameters selected</div>
+            </main>
+        </div>
+
+        <!-- ECU Calibration Page (view of scales & offsets from /params) -->
+        <div class="page" id="page-calibration">
+            <header class="page-header">
+                <button class="back-btn" data-page="settings">←</button>
+                <h1>ECU Calibration</h1>
+                <button class="simulate-btn" id="btnRefreshCal" title="Refresh">⟳</button>
+            </header>
+
+            <main class="settings-main">
+                <div class="settings-group">
+                    <h3 id="calEcuName">Scales &amp; Offsets</h3>
+                    <p class="text-muted" id="calStatus">Open to load…</p>
+                    <div class="cal-table-wrap">
+                        <table class="cal-table">
+                            <thead>
+                                <tr><th>Parameter</th><th>Unit</th><th>HW</th><th>Cal Slope</th><th>Cal Offset</th></tr>
+                            </thead>
+                            <tbody id="calTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="setting-item">
+                        <button class="btn btn-primary" id="btnSaveCal">
+                            <span class="btn-icon">💾</span> Save to Scanner
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Settings Page -->
+        <div class="page" id="page-settings">
+            <header class="page-header">
+                <button class="back-btn" data-page="home">←</button>
+                <h1>Settings</h1>
+            </header>
+
+            <main class="settings-main">
+                <div class="settings-group">
+                    <h3>Calibration</h3>
+                    <div class="setting-item">
+                        <button class="btn btn-secondary" id="btnOpenCal">
+                            <span class="btn-icon">🎚️</span> ECU Calibration
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Display</h3>
+                    <div class="setting-item">
+                        <label>Update Rate</label>
+                        <select id="settingRate">
+                            <option value="50">Fast (50ms)</option>
+                            <option value="100" selected>Normal (100ms)</option>
+                            <option value="250">Slow (250ms)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Units</label>
+                        <select id="settingUnits">
+                            <option value="imperial" selected>Imperial (°F, mph)</option>
+                            <option value="metric">Metric (°C, km/h)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Data</h3>
+                    <div class="setting-item">
+                        <button class="btn btn-secondary" id="btnClearData">
+                            <span class="btn-icon">🗑️</span> Clear All Data
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>About</h3>
+                    <div class="about-info">
+                        <p>BT Diagnostic Tool v2.0</p>
+                        <p class="text-muted">Bluetooth vehicle diagnostics</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

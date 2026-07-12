@@ -10,3 +10,7 @@ matplotlib
 
 # Firmware build system
 platformio
+
+# Regression tests (tests/) + HIL round-trip
+pytest
+requests

@@ -1,0 +1,19 @@
+{
+    "name": "OBD1 Scanner",
+    "short_name": "OBD1",
+    "description": "OBD1 Scanner device console",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0d1117",
+    "theme_color": "#0d1117",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "icons/dashboard.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["utilities", "automotive"]
+}

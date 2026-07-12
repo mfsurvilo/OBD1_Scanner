@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBD1 Scanner — USB Flasher</title>
+  <!-- ESP Web Tools: flash over USB straight from the browser (Web Serial). -->
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+           background:#0d1117; color:#e6edf3; line-height:1.5; }
+    header { padding:20px; border-bottom:1px solid #21262d; }
+    h1 { font-size:19px; margin:0; }
+    main { max-width:680px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:16px; }
+    .card { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:18px; }
+    .card h2 { font-size:16px; margin:0 0 6px; }
+    .card p { margin:0 0 14px; color:#8b949e; font-size:14px; }
+    .note { font-size:13px; }
+    .warn { border-left:3px solid #d29922; padding-left:12px; }
+    code { background:#0d1117; padding:1px 6px; border-radius:4px; font-size:13px; }
+    esp-web-install-button { --esp-tools-button-color:#fff; --esp-tools-button-background-color:#2f81f7; }
+    .red   esp-web-install-button { --esp-tools-button-background-color:#b3261e; }
+    .green esp-web-install-button { --esp-tools-button-background-color:#2e7d32; }
+    .unsupported { color:#f85149; font-size:13px; }
+  </style>
+</head>
+<body>
+  <header><h1>OBD1 Scanner — USB Flasher (recovery)</h1></header>
+  <main>
+    <div class="card warn note">
+      <strong>Use this if over-the-air (Wi-Fi) updates aren't working.</strong>
+      It re-flashes the entire device over USB and always recovers it.
+      Requires a desktop <strong>Chrome, Edge, or Opera</strong> browser
+      (Safari, Firefox, and phones don't support USB flashing from the browser).
+    </div>
+
+    <div class="card red">
+      <h2>Blink Red</h2>
+      <p>Full-flash recovery image for the blink-red firmware.</p>
+      <esp-web-install-button manifest="manifest-blink-red.json">
+        <button slot="activate">Connect &amp; Flash (Red)</button>
+        <span slot="unsupported" class="unsupported">Your browser can't flash over USB — use desktop Chrome/Edge.</span>
+        <span slot="not-allowed" class="unsupported">Serial access was blocked. Reload and allow the port.</span>
+      </esp-web-install-button>
+    </div>
+
+    <div class="card green">
+      <h2>Blink Green</h2>
+      <p>Full-flash recovery image for the blink-green firmware.</p>
+      <esp-web-install-button manifest="manifest-blink-green.json">
+        <button slot="activate">Connect &amp; Flash (Green)</button>
+        <span slot="unsupported" class="unsupported">Your browser can't flash over USB — use desktop Chrome/Edge.</span>
+        <span slot="not-allowed" class="unsupported">Serial access was blocked. Reload and allow the port.</span>
+      </esp-web-install-button>
+    </div>
+
+    <div class="card note">
+      <h2>How to flash</h2>
+      <p style="margin-bottom:8px">1. Plug the scanner into the computer with a USB cable.
+        2. Click a <em>Connect &amp; Flash</em> button. 3. Pick the device's serial port
+        (ESP32-S3 / <code>USB JTAG/serial</code>). 4. Confirm — it erases and reflashes, then reboots.</p>
+      <p style="margin:0">After flashing, the scanner broadcasts the
+        <code>OBD1_Scanner</code> Wi-Fi again and OTA updates should work.</p>
+    </div>
+  </main>
+</body>
+</html>
